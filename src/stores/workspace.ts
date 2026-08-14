@@ -1,0 +1,172 @@
+import { useMemo } from "react";
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+
+import {
+  folder as folderIpc,
+  IpcCallError,
+  workspace as ipc,
+  request as requestIpc,
+} from "@/lib/ipc";
+import type { Environment, HttpMethod, TreeNode, WorkspaceInfo } from "@/types/api";
+
+const MAX_RECENT = 8;
+
+type Status = "empty" | "loading" | "ready" | "error";
+
+interface WorkspaceState {
+  info: WorkspaceInfo | null;
+  tree: TreeNode[];
+  environments: Environment[];
+  activeEnvironment: string | null;
+  status: Status;
+  error: IpcCallError | null;
+  /** 最近打开过的工作区路径，最新的在前 */
+  recent: string[];
+
+  open: (path: string) => Promise<void>;
+  init: (path: string, name: string) => Promise<void>;
+  /** 重新扫描磁盘。外部编辑、git pull、切分支之后都要调用。 */
+  refresh: () => Promise<void>;
+  /** 新建请求，返回其 id */
+  createRequest: (parent: string | null, name: string, method?: HttpMethod) => Promise<string>;
+  /** 新建文件夹，返回其 id */
+  createFolder: (parent: string | null, name: string) => Promise<string>;
+  deleteRequest: (id: string) => Promise<void>;
+  setActiveEnvironment: (name: string | null) => void;
+  forgetRecent: (path: string) => void;
+  clearError: () => void;
+}
+
+export const useWorkspace = create<WorkspaceState>()(
+  persist(
+    (set, get) => {
+      /** 打开/初始化成功后统一装载集合树与环境 */
+      async function load(info: WorkspaceInfo, path: string) {
+        const [tree, environments] = await Promise.all([ipc.tree(), ipc.environments()]);
+
+        const recent = [path, ...get().recent.filter((p) => p !== path)].slice(0, MAX_RECENT);
+        const active = get().activeEnvironment;
+
+        set({
+          info,
+          tree,
+          environments,
+          recent,
+          status: "ready",
+          error: null,
+          // 之前选的环境在新工作区里可能不存在，此时退回第一个
+          activeEnvironment:
+            active && environments.some((e) => e.name === active)
+              ? active
+              : (environments[0]?.name ?? null),
+        });
+      }
+
+      /** 统一的错误归置：记进 store 供 UI 展示，同时抛出让调用方能按 kind 分支 */
+      function fail(error: unknown): never {
+        const ipcError =
+          error instanceof IpcCallError ? error : new IpcCallError("invalid", String(error));
+        set({ status: "error", error: ipcError });
+        throw ipcError;
+      }
+
+      return {
+        info: null,
+        tree: [],
+        environments: [],
+        activeEnvironment: null,
+        status: "empty",
+        error: null,
+        recent: [],
+
+        open: async (path) => {
+          set({ status: "loading", error: null });
+          try {
+            await load(await ipc.open(path), path);
+          } catch (error) {
+            fail(error);
+          }
+        },
+
+        init: async (path, name) => {
+          set({ status: "loading", error: null });
+          try {
+            await load(await ipc.init(path, name), path);
+          } catch (error) {
+            fail(error);
+          }
+        },
+
+        refresh: async () => {
+          if (!get().info) return;
+          try {
+            const [tree, environments] = await Promise.all([ipc.tree(), ipc.environments()]);
+            set({ tree, environments });
+          } catch (error) {
+            // 刷新失败不该把整个界面打回错误态——之前加载的树仍然可用
+            console.error("刷新工作区失败", error);
+          }
+        },
+
+        createRequest: async (parent, name, method) => {
+          const id = await requestIpc.create(parent, name, method);
+          await get().refresh();
+          return id;
+        },
+
+        createFolder: async (parent, name) => {
+          const id = await folderIpc.create(parent, name);
+          await get().refresh();
+          return id;
+        },
+
+        deleteRequest: async (id) => {
+          await requestIpc.remove(id);
+          await get().refresh();
+        },
+
+        setActiveEnvironment: (activeEnvironment) => set({ activeEnvironment }),
+
+        forgetRecent: (path) => set((s) => ({ recent: s.recent.filter((p) => p !== path) })),
+
+        clearError: () => set((s) => ({ error: null, status: s.info ? "ready" : "empty" })),
+      };
+    },
+    {
+      name: "postkiddie.workspace",
+      version: 1,
+      // 只持久化「下次启动需要的线索」，树和环境每次都从磁盘重新扫描——
+      // 磁盘是唯一事实来源，缓存它只会带来不一致
+      partialize: (s) => ({
+        recent: s.recent,
+        activeEnvironment: s.activeEnvironment,
+      }),
+    },
+  ),
+);
+
+/**
+ * 当前环境里已定义的变量名。
+ *
+ * 返回稳定引用（useMemo）：CodeMirror 的变量高亮插件靠比较引用判断是否需要
+ * 重算全部装饰，每次渲染都换新 Set 会导致整篇文档反复重绘。
+ */
+export function useKnownVariables(): ReadonlySet<string> {
+  const environments = useWorkspace((s) => s.environments);
+  const active = useWorkspace((s) => s.activeEnvironment);
+
+  return useMemo(() => {
+    const env = environments.find((e) => e.name === active);
+    return new Set((env?.variables ?? []).filter((v) => v.enabled !== false).map((v) => v.name));
+  }, [environments, active]);
+}
+
+/** 当前工作区的所有请求节点，按树的深度优先顺序展开 */
+export function flattenRequests(nodes: TreeNode[]): Extract<TreeNode, { kind: "request" }>[] {
+  return nodes.flatMap((node) => {
+    if (node.kind === "request") return [node];
+    if (node.kind === "folder") return flattenRequests(node.children);
+    return [];
+  });
+}

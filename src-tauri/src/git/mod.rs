@@ -91,6 +91,12 @@ pub trait GitBackend: Send + Sync {
     /// 校验路径是一个 git 工作树，返回仓库根的绝对路径
     fn discover_repo(&self, path: &Path) -> Result<std::path::PathBuf>;
 
+    /// 在指定目录初始化 git 仓库。
+    ///
+    /// 仅在新建工作区且该目录尚不在任何仓库内时调用，且必须由 UI 明确告知用户后再执行——
+    /// 在别人的目录里凭空创建 .git 是有副作用的操作，不能悄悄做。
+    fn init(&self, path: &Path) -> Result<()>;
+
     fn status(&self, repo: &Path) -> Result<GitStatus>;
 
     fn stage(&self, repo: &Path, paths: &[String]) -> Result<()>;

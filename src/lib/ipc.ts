@@ -14,6 +14,7 @@ import type {
   CommitInfo,
   Environment,
   GitStatus,
+  HttpMethod,
   HttpRequest,
   HttpResponse,
   IpcError,
@@ -78,6 +79,9 @@ export const workspace = {
 export const request = {
   read: (id: string) => call<HttpRequest>("request_read", { id }),
   save: (id: string, req: HttpRequest) => call<void>("request_save", { id, request: req }),
+  /** 返回新请求的 id。路径拼装与重名消歧都在 Rust 侧完成。 */
+  create: (parent: string | null, name: string, method?: HttpMethod) =>
+    call<string>("request_create", { parent, name, method: method ?? null }),
   remove: (id: string) => call<void>("request_delete", { id }),
   send: (req: HttpRequest, environment?: string) =>
     call<HttpResponse>("request_send", {
@@ -89,6 +93,11 @@ export const request = {
       request: req,
       environment: environment ?? null,
     }),
+};
+
+export const folder = {
+  /** 返回新文件夹的 id */
+  create: (parent: string | null, name: string) => call<string>("folder_create", { parent, name }),
 };
 
 // ---------------------------------------------------------------------------

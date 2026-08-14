@@ -141,11 +141,21 @@ impl GitBackend for GitCli {
         Ok(PathBuf::from(root))
     }
 
+    fn init(&self, path: &Path) -> Result<()> {
+        // 不传 -b：让默认分支名沿用用户的 init.defaultBranch 配置，
+        // 与「复用系统 git 既有配置」的整体取向一致
+        self.run(path, ["init"])?;
+        Ok(())
+    }
+
     fn status(&self, repo: &Path) -> Result<GitStatus> {
-        // `-z` 用 NUL 分隔且不转义文件名——中文路径和含空格的名字必须靠它才能正确解析
+        // `-z`    用 NUL 分隔且不转义文件名——中文路径和含空格的名字必须靠它才能正确解析
+        // `-uall` 未跟踪项要展开到**文件**级。默认的 normal 模式会把整个未跟踪目录
+        //         折叠成一行（如 `collections/`），而侧边栏需要逐个请求文件的状态。
+        //         代价是未跟踪文件极多时会变慢，但请求集合仓库本就很小。
         let raw = self.run_text(
             repo,
-            ["status", "--porcelain=v1", "--branch", "-z", "-unormal"],
+            ["status", "--porcelain=v1", "--branch", "-z", "-uall"],
         )?;
         Ok(parse_status(&raw))
     }

@@ -4,6 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
     <title>PostKiddie</title>
+    <!--
+      首帧背景色内联在这里，而不是靠 JS 在挂载后调用 window.show()。
+
+      Tauri 官方示例常用 `visible: false` + 前端 show() 来避开启动白闪，但那让
+      「窗口是否出现」取决于前端 JS 能否执行到那一行——前端任何一处报错，
+      用户看到的就是「应用启动了但没有窗口」，且完全无从排查。
+      内联样式在 CSS bundle 加载前就生效，同样消除白闪，且不依赖任何脚本。
+
+      这里的两个值必须与 tokens.css 的 --pk-bg-canvas 保持一致。
+    -->
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background-color: light-dark(oklch(96.5% 0.005 264), oklch(10.5% 0.008 264));
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

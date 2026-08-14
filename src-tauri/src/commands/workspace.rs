@@ -47,7 +47,10 @@ pub async fn workspace_open(state: State<'_, AppState>, path: String) -> Result<
     Ok(info)
 }
 
-/// 在指定目录初始化新工作区。目录须已是 git 仓库。
+/// 在指定目录初始化新工作区。
+///
+/// 目录若尚不在任何 git 仓库内，会就地 `git init`——「用 git 管理」是本应用的前提，
+/// 让用户为此切到终端跑一条命令是没必要的摩擦。调用方必须已在 UI 上说明这一点。
 #[tauri::command]
 pub async fn workspace_init(
     state: State<'_, AppState>,
@@ -57,7 +60,15 @@ pub async fn workspace_init(
     let root = PathBuf::from(&path);
     std::fs::create_dir_all(&root)?;
 
-    let repo_root = state.git.discover_repo(&root)?;
+    let repo_root = match state.git.discover_repo(&root) {
+        Ok(existing) => existing,
+        Err(_) => {
+            tracing::info!(path = %root.display(), "目录不在 git 仓库内，就地初始化");
+            state.git.init(&root)?;
+            state.git.discover_repo(&root)?
+        }
+    };
+
     let ws = Workspace::init(&root, &name)?;
 
     let info = WorkspaceInfo {

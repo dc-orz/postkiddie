@@ -1,0 +1,217 @@
+/**
+ * 全局样式入口
+ * ============
+ * 引入顺序不可调整：tailwind → tokens → theme 桥接 → base 层。
+ * 组件样式一律走 Tailwind 工具类，这里只放「无法用工具类表达的全局行为」。
+ */
+
+@import "tailwindcss";
+@import "./tokens.css";
+@import "./theme.css";
+
+/* 主题切换靠 color-scheme 而非 class，故不需要 Tailwind 的 dark: 变体走 class 策略。
+   但保留 dark: 变体以便个别场景做微调（如给暗色下的图片降低亮度）。 */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@layer base {
+  /* --- 重置 --- */
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    /* 默认边框色跟随语义 token，写 `border` 时无需每次指定颜色 */
+    border-color: var(--pk-border-default);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    /* 桌面应用禁止整页缩放与橡皮筋回弹，否则会露出窗口底色 */
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--pk-bg-canvas);
+    color: var(--pk-text-primary);
+    font-family: var(--pk-font-sans);
+    font-size: var(--pk-text-sm);
+    line-height: var(--pk-leading-normal);
+    font-weight: var(--pk-weight-normal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+
+    /* 桌面应用默认不可选中文本——只有内容区显式开启。
+       这样拖拽窗口、点击列表时不会误选出一片蓝。 */
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: default;
+
+    /* 禁用长按弹出的系统菜单（WebKit） */
+    -webkit-touch-callout: none;
+  }
+
+  /* 内容区恢复可选中：响应体、编辑器、以及任何显式标记的元素 */
+  input,
+  textarea,
+  [contenteditable],
+  [data-selectable],
+  .cm-editor,
+  .pk-selectable {
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: auto;
+  }
+
+  /* --- 焦点：只在键盘导航时显示焦点环，鼠标点击不显示 --- */
+  :focus {
+    outline: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--pk-border-focus);
+    outline-offset: 1px;
+    border-radius: var(--pk-radius-xs);
+  }
+
+  /* --- 文本选中色 --- */
+  ::selection {
+    background-color: var(--pk-accent-bg-subtle);
+    color: var(--pk-text-primary);
+  }
+
+  /* --- 滚动条：细窄、悬停才明显，不占用视觉注意力 --- */
+  ::-webkit-scrollbar {
+    width: var(--pk-scrollbar-size);
+    height: var(--pk-scrollbar-size);
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--pk-border-strong);
+    border-radius: var(--pk-radius-full);
+    /* 用透明边框把滑块「收窄」，形成内嵌留白 */
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--pk-text-subtle);
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Firefox / 标准属性 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--pk-border-strong) transparent;
+  }
+
+  /* --- 表单元素继承排版，避免各平台默认字体串味 --- */
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+  }
+
+  button {
+    cursor: default;
+    background: none;
+    border: none;
+    padding: 0;
+  }
+
+  /* 数字输入去掉步进箭头：请求超时、端口这类字段用不上 */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+
+  input[type="search"]::-webkit-search-decoration,
+  input[type="search"]::-webkit-search-cancel-button {
+    appearance: none;
+  }
+
+  ::placeholder {
+    color: var(--pk-text-subtle);
+    opacity: 1;
+  }
+
+  /* --- 图片不可拖拽，防止把 icon 拖出窗口 --- */
+  img,
+  svg {
+    -webkit-user-drag: none;
+    user-select: none;
+  }
+
+  svg {
+    display: block;
+    flex-shrink: 0;
+  }
+
+  /* --- 等宽文本统一开启等宽数字与连字关闭 --- */
+  code,
+  pre,
+  kbd,
+  samp,
+  .pk-mono {
+    font-family: var(--pk-font-mono);
+    font-variant-ligatures: none;
+    font-feature-settings: "tnum" 1;
+  }
+}
+
+@layer utilities {
+  /* 自定义标题栏的拖拽区域（Tauri decorations: false 时使用） */
+  .pk-drag-region {
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+
+  .pk-no-drag {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+
+  /* 等宽数字：状态码、耗时、体积等数值列对齐时必用，避免数字跳动 */
+  .pk-tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 单行省略 */
+  .pk-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 屏幕阅读器可见、视觉隐藏 */
+  .pk-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border-width: 0;
+  }
+}

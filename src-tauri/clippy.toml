@@ -1,0 +1,11 @@
+# 单个函数参数超过 7 个说明该收进 struct 了
+too-many-arguments-threshold = 7
+
+# 认知复杂度上限，超过则拆函数
+cognitive-complexity-threshold = 25
+
+# 禁止在业务代码里直接 unwrap/expect 之外的常见坑
+avoid-breaking-exported-api = false
+
+# 允许的「魔法数字」：HTTP 相关常量与常见时间单位
+allowed-idents-below-min-chars = ["ms", "ok", "id", "to", "vs"]

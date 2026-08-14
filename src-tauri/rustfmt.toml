@@ -1,0 +1,7 @@
+# rustfmt 只启用 stable 通道支持的选项，保证 `cargo fmt` 在 CI 与本地行为一致
+edition = "2024"
+max_width = 100
+tab_spaces = 4
+newline_style = "Unix"
+use_field_init_shorthand = true
+use_try_shorthand = true

@@ -1,0 +1,189 @@
+/**
+ * Tailwind 4 主题桥接层
+ * =====================
+ *
+ * 把 tokens.css 的语义层暴露成 Tailwind 工具类。
+ *
+ * 关键点一：必须用 `@theme inline`。
+ *   `@theme`        → .bg-surface { background-color: <展开后的字面值> }   主题切换失效
+ *   `@theme inline` → .bg-surface { background-color: var(--pk-bg-surface) } 主题切换生效
+ *
+ * 关键点二：`bg-*` / `text-*` / `border-*` 在 Tailwind 4 中**共用** `--color-*`
+ * 这一个命名空间。因此这里的名字必须整体无歧义，不能背景和文字各出现一个 `subtle`。
+ * 采用的区分前缀：
+ *   背景     无前缀      bg-surface / bg-hover / bg-sunken
+ *   前景     fg-         text-fg / text-fg-muted / text-fg-subtle
+ *   描边     line-       border-line / border-line-strong
+ * 注意这只是**类名**层的消歧，tokens.css 里的语义变量名保持原样。
+ *
+ * 关键点三：`--color-*: initial` 清空 Tailwind 内置调色板，让 `bg-blue-500`
+ * 这类脱离 design token 的写法在编译期就失效。需要新颜色 → 去 tokens.css 加语义 token。
+ *
+ * 关键点四：宽高工具类读的是 `--spacing-*`（不存在 `--height-*` 命名空间），
+ * 所以布局尺寸一律注册到 spacing 下，`h-titlebar` / `w-sidebar` 才会被生成。
+ */
+
+@theme inline {
+  /* ==================== 颜色 ==================== */
+  --color-*: initial;
+
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-inherit: inherit;
+
+  /* ---- 背景（无前缀） ---- */
+  --color-canvas: var(--pk-bg-canvas);
+  --color-surface: var(--pk-bg-surface);
+  --color-raised: var(--pk-bg-raised);
+  --color-sunken: var(--pk-bg-sunken);
+  --color-inset: var(--pk-bg-inset);
+  --color-hover: var(--pk-bg-hover);
+  --color-active: var(--pk-bg-active);
+  --color-selected: var(--pk-bg-selected);
+  --color-disabled: var(--pk-bg-disabled);
+
+  /* ---- 前景（fg- 前缀） ---- */
+  --color-fg: var(--pk-text-primary);
+  --color-fg-secondary: var(--pk-text-secondary);
+  --color-fg-muted: var(--pk-text-muted);
+  --color-fg-subtle: var(--pk-text-subtle);
+  --color-fg-disabled: var(--pk-text-disabled);
+  --color-fg-on-accent: var(--pk-text-on-accent);
+  --color-fg-link: var(--pk-text-link);
+
+  /* ---- 描边（line- 前缀） ---- */
+  --color-line: var(--pk-border-default);
+  --color-line-subtle: var(--pk-border-subtle);
+  --color-line-strong: var(--pk-border-strong);
+  --color-line-accent: var(--pk-border-accent);
+  --color-line-focus: var(--pk-border-focus);
+
+  /* ---- 强调 ---- */
+  --color-accent: var(--pk-accent-bg);
+  --color-accent-hover: var(--pk-accent-bg-hover);
+  --color-accent-active: var(--pk-accent-bg-active);
+  --color-accent-soft: var(--pk-accent-bg-subtle);
+  --color-accent-fg: var(--pk-accent-fg);
+
+  /* ---- 反馈状态：<name> 实心/前景、<name>-soft 浅底、<name>-line 描边 ---- */
+  --color-success: var(--pk-success-fg);
+  --color-success-soft: var(--pk-success-bg);
+  --color-success-line: var(--pk-success-border);
+
+  --color-warning: var(--pk-warning-fg);
+  --color-warning-soft: var(--pk-warning-bg);
+  --color-warning-line: var(--pk-warning-border);
+
+  --color-danger: var(--pk-danger-fg);
+  --color-danger-soft: var(--pk-danger-bg);
+  --color-danger-line: var(--pk-danger-border);
+  --color-danger-solid: var(--pk-danger-solid);
+
+  --color-info: var(--pk-info-fg);
+  --color-info-soft: var(--pk-info-bg);
+  --color-info-line: var(--pk-info-border);
+
+  /* ---- HTTP Method ---- */
+  --color-method-get: var(--pk-method-get);
+  --color-method-post: var(--pk-method-post);
+  --color-method-put: var(--pk-method-put);
+  --color-method-patch: var(--pk-method-patch);
+  --color-method-delete: var(--pk-method-delete);
+  --color-method-head: var(--pk-method-head);
+  --color-method-options: var(--pk-method-options);
+
+  /* ---- 状态码 ---- */
+  --color-status-1xx: var(--pk-status-1xx);
+  --color-status-2xx: var(--pk-status-2xx);
+  --color-status-3xx: var(--pk-status-3xx);
+  --color-status-4xx: var(--pk-status-4xx);
+  --color-status-5xx: var(--pk-status-5xx);
+
+  /* ---- Git ---- */
+  --color-git-added: var(--pk-git-added);
+  --color-git-modified: var(--pk-git-modified);
+  --color-git-deleted: var(--pk-git-deleted);
+  --color-git-renamed: var(--pk-git-renamed);
+  --color-git-untracked: var(--pk-git-untracked);
+  --color-git-conflicted: var(--pk-git-conflicted);
+  --color-git-ahead: var(--pk-git-ahead);
+  --color-git-behind: var(--pk-git-behind);
+  --color-diff-add: var(--pk-diff-add-bg);
+  --color-diff-del: var(--pk-diff-del-bg);
+
+  /* ==================== 排版 ==================== */
+  --font-sans: var(--pk-font-sans);
+  --font-mono: var(--pk-font-mono);
+
+  --text-*: initial;
+  --text-2xs: var(--pk-text-2xs);
+  --text-xs: var(--pk-text-xs);
+  --text-sm: var(--pk-text-sm);
+  --text-base: var(--pk-text-base);
+  --text-md: var(--pk-text-md);
+  --text-lg: var(--pk-text-lg);
+  --text-xl: var(--pk-text-xl);
+  --text-2xl: var(--pk-text-2xl);
+
+  --leading-none: var(--pk-leading-none);
+  --leading-tight: var(--pk-leading-tight);
+  --leading-snug: var(--pk-leading-snug);
+  --leading-normal: var(--pk-leading-normal);
+  --leading-code: var(--pk-leading-code);
+  --leading-relaxed: var(--pk-leading-relaxed);
+
+  --font-weight-normal: var(--pk-weight-normal);
+  --font-weight-medium: var(--pk-weight-medium);
+  --font-weight-semibold: var(--pk-weight-semibold);
+  --font-weight-bold: var(--pk-weight-bold);
+
+  --tracking-tight: var(--pk-tracking-tight);
+  --tracking-normal: var(--pk-tracking-normal);
+  --tracking-wide: var(--pk-tracking-wide);
+  --tracking-caps: var(--pk-tracking-caps);
+
+  /* ==================== 圆角 ==================== */
+  --radius-*: initial;
+  --radius-none: var(--pk-radius-none);
+  --radius-xs: var(--pk-radius-xs);
+  --radius-sm: var(--pk-radius-sm);
+  --radius-md: var(--pk-radius-md);
+  --radius-lg: var(--pk-radius-lg);
+  --radius-xl: var(--pk-radius-xl);
+  --radius-full: var(--pk-radius-full);
+
+  /* ==================== 阴影 ==================== */
+  --shadow-*: initial;
+  --shadow-xs: var(--pk-shadow-xs);
+  --shadow-sm: var(--pk-shadow-sm);
+  --shadow-md: var(--pk-shadow-md);
+  --shadow-lg: var(--pk-shadow-lg);
+  --shadow-overlay: var(--pk-shadow-overlay);
+
+  /* ==================== 动效 ==================== */
+  --ease-standard: var(--pk-ease-standard);
+  --ease-out: var(--pk-ease-out);
+  --ease-in: var(--pk-ease-in);
+  --ease-spring: var(--pk-ease-spring);
+
+  --duration-fast: var(--pk-duration-fast);
+  --duration-normal: var(--pk-duration-normal);
+  --duration-slow: var(--pk-duration-slow);
+
+  /* ==================== 布局尺寸 ====================
+   * 注册到 spacing 命名空间，故 h-* / w-* / min-w-* / gap-* 都能引用。
+   * 4px 基准的动态 spacing（p-1 / p-2.5 …）不受影响，仍然可用。
+   */
+  --spacing-titlebar: var(--pk-h-titlebar);
+  --spacing-toolbar: var(--pk-h-toolbar);
+  --spacing-tab: var(--pk-h-tab);
+  --spacing-statusbar: var(--pk-h-statusbar);
+  --spacing-row: var(--pk-h-row);
+  --spacing-control-sm: var(--pk-h-control-sm);
+  --spacing-control-md: var(--pk-h-control-md);
+  --spacing-control-lg: var(--pk-h-control-lg);
+  --spacing-sidebar: var(--pk-w-sidebar);
+  --spacing-sidebar-min: var(--pk-w-sidebar-min);
+  --spacing-sidebar-max: var(--pk-w-sidebar-max);
+  --spacing-indent: var(--pk-indent-tree);
+}

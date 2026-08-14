@@ -1,0 +1,99 @@
+[package]
+name = "postkiddie"
+version = "0.1.0"
+description = "基于本地 Git 目录管理与共享 HTTP 请求的轻量桌面客户端"
+authors = ["postkiddie contributors"]
+edition = "2024"
+rust-version = "1.88"
+license = "MIT"
+repository = "https://github.com/postkiddie/postkiddie"
+default-run = "postkiddie"
+
+# Tauri 要求 lib 名固定，移动端入口由此导出
+[lib]
+name = "postkiddie_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5", features = [] }
+
+[dependencies]
+tauri = { version = "2.11", features = ["protocol-asset"] }
+tauri-plugin-opener = "2.5"
+tauri-plugin-dialog = "2.7"
+
+# --- 序列化 ---
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+# serde_yaml 已于 2024 归档，serde_norway 是维护中的直系 fork
+serde_norway = "0.9"
+
+# --- 异步运行时 ---
+tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "fs", "process", "time", "sync", "io-util"] }
+futures-util = "0.3"
+
+# --- HTTP 客户端 ---
+# 关闭 default-features 以避免引入 native-tls。
+# 0.13 把能力拆得很细，以下每一项都是被实际用到的：
+#   rustls + rustls-native-certs  纯 Rust TLS，且读取系统根证书
+#                                 （企业自签 CA 通常装在系统钥匙串，缺它就连不上内网 HTTPS）
+#   system-proxy                  读取系统代理设置，0.13 起不再默认启用
+#   form / query                  RequestBuilder::form() 与 ::query() 所需
+reqwest = { version = "0.13", default-features = false, features = [
+  "rustls",
+  "rustls-native-certs",
+  "system-proxy",
+  "http2",
+  "charset",
+  "gzip",
+  "brotli",
+  "deflate",
+  "zstd",
+  "json",
+  "form",
+  "query",
+  "stream",
+  "multipart",
+  "cookies",
+] }
+url = "2.5"
+percent-encoding = "2.3"
+mime_guess = "2.0"
+base64 = "0.23"
+
+# --- 错误处理 ---
+# 库内部用 thiserror 定义具名错误；命令层统一转成可序列化的 AppError 返回前端
+thiserror = "2.0"
+
+# --- 日志 ---
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "time"] }
+
+# --- 工具 ---
+uuid = { version = "1.24", features = ["v7", "serde"] }
+jiff = { version = "0.2", features = ["serde"] }
+notify = "8.2"
+dirs = "6.0"
+
+[dev-dependencies]
+tokio = { version = "1.53", features = ["full", "test-util"] }
+tempfile = "3"
+
+[features]
+default = ["custom-protocol"]
+# tauri build 时由 CLI 注入，用于区分 dev server 与打包资源
+custom-protocol = ["tauri/custom-protocol"]
+
+# 发布构建：体积与启动速度优先。
+# 桌面工具的启动耗时是「感觉卡不卡」的第一印象，opt-level="s" + LTO 收益明显。
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+incremental = false
+
+# dev 构建下让依赖走优化，否则 reqwest/serde 在 debug 下慢到影响调试体验
+[profile.dev.package."*"]
+opt-level = 2

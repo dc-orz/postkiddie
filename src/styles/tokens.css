@@ -1,0 +1,408 @@
+/**
+ * PostKiddie Design Tokens
+ * ========================
+ *
+ * 三层结构，单向依赖，禁止跨层反向引用：
+ *
+ *   1. Primitive  --pk-gray-500 / --pk-green-600     原始值，不随主题变化，UI 代码禁止直接使用
+ *   2. Semantic   --pk-bg-surface / --pk-text-muted   按用途命名，主题在此层切换 ← 组件默认用这层
+ *   3. Component  --pk-method-get / --pk-status-2xx   领域专用，仅在语义层不足以表达时新增
+ *
+ * 主题机制：语义层用 CSS 原生 `light-dark()`，亮暗值写在同一行，
+ * 由 `color-scheme` 决定取哪个值。切换主题只需改 :root 的 color-scheme：
+ *   跟随系统 → color-scheme: light dark  (默认)
+ *   强制亮色 → color-scheme: light
+ *   强制暗色 → color-scheme: dark
+ * 附带收益：滚动条、原生 input、select 等系统控件会自动跟随，无需额外样式。
+ *
+ * 色彩空间统一用 OKLCH：感知均匀，同一 lightness 的不同色相视觉权重一致，
+ * 这是「method 徽章一排排开时不会有某个颜色显得特别跳」的前提。
+ */
+
+:root {
+  /* ==========================================================================
+   * 1. PRIMITIVE — 原始色阶
+   * 不随主题变化。UI 代码不要直接引用，请用下面的语义层。
+   * ========================================================================== */
+
+  /* 中性色：冷调灰（hue 264），避免纯黑纯白带来的廉价感与眩光 */
+  --pk-gray-0: oklch(100% 0 0);
+  --pk-gray-25: oklch(99.2% 0.0015 264);
+  --pk-gray-50: oklch(98.3% 0.003 264);
+  --pk-gray-100: oklch(96.5% 0.005 264);
+  --pk-gray-150: oklch(94.3% 0.006 264);
+  --pk-gray-200: oklch(91.6% 0.008 264);
+  --pk-gray-300: oklch(85.8% 0.011 264);
+  --pk-gray-400: oklch(71.8% 0.015 264);
+  --pk-gray-450: oklch(65.5% 0.016 264);
+  --pk-gray-500: oklch(59.6% 0.017 264);
+  --pk-gray-550: oklch(54.2% 0.017 264);
+  --pk-gray-600: oklch(48.6% 0.017 264);
+  --pk-gray-700: oklch(39.6% 0.016 264);
+  --pk-gray-800: oklch(29.8% 0.014 264);
+  --pk-gray-850: oklch(24.2% 0.013 264);
+  --pk-gray-900: oklch(19.6% 0.011 264);
+  --pk-gray-925: oklch(16.8% 0.01 264);
+  --pk-gray-950: oklch(14.2% 0.009 264);
+  --pk-gray-1000: oklch(10.5% 0.008 264);
+
+  /* 强调色：靛蓝（hue 258）。全应用只有一个强调色，克制是简约的前提 */
+  --pk-accent-50: oklch(97.2% 0.014 258);
+  --pk-accent-100: oklch(94.2% 0.032 258);
+  --pk-accent-200: oklch(89.0% 0.058 258);
+  --pk-accent-300: oklch(81.2% 0.094 258);
+  --pk-accent-400: oklch(71.5% 0.138 258);
+  --pk-accent-500: oklch(62.5% 0.172 258);
+  --pk-accent-600: oklch(55.2% 0.182 258);
+  --pk-accent-700: oklch(47.5% 0.165 258);
+  --pk-accent-800: oklch(39.5% 0.132 258);
+  --pk-accent-900: oklch(32.5% 0.098 258);
+
+  /* 绿（hue 152）— 成功 / GET / 2xx / git added */
+  --pk-green-100: oklch(94.5% 0.045 152);
+  --pk-green-200: oklch(88.5% 0.085 152);
+  --pk-green-300: oklch(80.0% 0.13 152);
+  --pk-green-400: oklch(72.0% 0.15 152);
+  --pk-green-500: oklch(63.5% 0.145 152);
+  --pk-green-600: oklch(55.0% 0.128 152);
+  --pk-green-700: oklch(45.5% 0.105 152);
+  --pk-green-900: oklch(28.0% 0.062 152);
+
+  /* 琥珀（hue 78）— 警告 / POST / 4xx / git modified */
+  --pk-amber-100: oklch(95.5% 0.055 78);
+  --pk-amber-200: oklch(90.5% 0.105 78);
+  --pk-amber-300: oklch(84.5% 0.145 78);
+  --pk-amber-400: oklch(78.5% 0.155 78);
+  --pk-amber-500: oklch(70.5% 0.145 78);
+  --pk-amber-600: oklch(60.5% 0.128 78);
+  --pk-amber-700: oklch(50.0% 0.108 78);
+  --pk-amber-900: oklch(31.0% 0.065 78);
+
+  /* 红（hue 25）— 危险 / DELETE / 5xx / git deleted */
+  --pk-red-100: oklch(94.5% 0.03 25);
+  --pk-red-200: oklch(89.0% 0.06 25);
+  --pk-red-300: oklch(80.5% 0.11 25);
+  --pk-red-400: oklch(71.0% 0.165 25);
+  --pk-red-500: oklch(62.5% 0.198 25);
+  --pk-red-600: oklch(55.0% 0.196 25);
+  --pk-red-700: oklch(46.5% 0.172 25);
+  --pk-red-900: oklch(29.5% 0.105 25);
+
+  /* 蓝（hue 235）— 信息 / PUT / 3xx / git renamed */
+  --pk-blue-100: oklch(94.5% 0.03 235);
+  --pk-blue-200: oklch(89.0% 0.058 235);
+  --pk-blue-300: oklch(80.5% 0.1 235);
+  --pk-blue-400: oklch(71.5% 0.135 235);
+  --pk-blue-500: oklch(63.0% 0.155 235);
+  --pk-blue-600: oklch(55.0% 0.16 235);
+  --pk-blue-700: oklch(46.0% 0.14 235);
+  --pk-blue-900: oklch(29.5% 0.085 235);
+
+  /* 紫（hue 300）— PATCH */
+  --pk-violet-100: oklch(94.5% 0.032 300);
+  --pk-violet-300: oklch(80.0% 0.11 300);
+  --pk-violet-400: oklch(71.5% 0.15 300);
+  --pk-violet-500: oklch(62.0% 0.18 300);
+  --pk-violet-600: oklch(54.5% 0.185 300);
+  --pk-violet-700: oklch(46.0% 0.16 300);
+  --pk-violet-900: oklch(30.0% 0.098 300);
+
+  /* 青（hue 195）— HEAD / 次要提示 */
+  --pk-teal-100: oklch(94.5% 0.03 195);
+  --pk-teal-300: oklch(81.0% 0.09 195);
+  --pk-teal-500: oklch(63.5% 0.115 195);
+  --pk-teal-600: oklch(55.0% 0.105 195);
+  --pk-teal-700: oklch(45.5% 0.088 195);
+  --pk-teal-900: oklch(29.0% 0.052 195);
+
+  /* ==========================================================================
+   * 2. SEMANTIC — 语义层
+   * 组件默认只引用这一层。亮/暗两个值并列，由 color-scheme 决定生效哪个。
+   * ========================================================================== */
+
+  /* 默认跟随系统；应用可通过设置改写为 light / dark */
+  color-scheme: light dark;
+
+  /* --- 背景：四级层次，靠明度差而非阴影建立空间关系 --- */
+  /* canvas 最底 → surface 主面板 → raised 浮起(菜单/弹层) → sunken 凹陷(输入框/代码块) */
+  --pk-bg-canvas: light-dark(var(--pk-gray-100), var(--pk-gray-1000));
+  --pk-bg-surface: light-dark(var(--pk-gray-0), var(--pk-gray-950));
+  --pk-bg-raised: light-dark(var(--pk-gray-0), var(--pk-gray-900));
+  --pk-bg-sunken: light-dark(var(--pk-gray-50), var(--pk-gray-1000));
+  --pk-bg-inset: light-dark(var(--pk-gray-100), var(--pk-gray-925));
+
+  /* 交互态背景：hover/active 用极低对比的叠加，不改变布局观感 */
+  --pk-bg-hover: light-dark(var(--pk-gray-100), var(--pk-gray-850));
+  --pk-bg-active: light-dark(var(--pk-gray-150), var(--pk-gray-800));
+  --pk-bg-selected: light-dark(var(--pk-accent-50), oklch(28% 0.055 258));
+  --pk-bg-disabled: light-dark(var(--pk-gray-100), var(--pk-gray-900));
+
+  /* --- 文本：四级层次 --- */
+  --pk-text-primary: light-dark(var(--pk-gray-900), var(--pk-gray-100));
+  --pk-text-secondary: light-dark(var(--pk-gray-700), var(--pk-gray-300));
+  /* muted 承载真实信息（时间戳、说明文字），必须在**所有**背景上达到 AA 4.5:1，
+     其中最苛刻的是 hover 态背景。色阶按此反推得到：亮色 550 / 暗色 450。 */
+  --pk-text-muted: light-dark(var(--pk-gray-550), var(--pk-gray-450));
+  /* subtle 是最弱的一级（占位符、纯装饰），目标 ≥3:1。
+     与 muted 恰好在亮暗之间对调，这不是巧合——两侧的背景亮度也是对称的。 */
+  --pk-text-subtle: light-dark(var(--pk-gray-450), var(--pk-gray-550));
+  --pk-text-disabled: light-dark(var(--pk-gray-400), var(--pk-gray-700));
+  --pk-text-on-accent: light-dark(var(--pk-gray-0), var(--pk-gray-0));
+  --pk-text-link: light-dark(var(--pk-accent-600), var(--pk-accent-400));
+
+  /* --- 边框：简约风格的主要分隔手段，取代阴影 --- */
+  --pk-border-subtle: light-dark(var(--pk-gray-150), var(--pk-gray-900));
+  --pk-border-default: light-dark(var(--pk-gray-200), var(--pk-gray-850));
+  --pk-border-strong: light-dark(var(--pk-gray-300), var(--pk-gray-800));
+  --pk-border-accent: light-dark(var(--pk-accent-500), var(--pk-accent-500));
+  --pk-border-focus: light-dark(var(--pk-accent-600), var(--pk-accent-400));
+
+  /* --- 强调 / 交互主色 ---
+     亮暗共用同一组色阶。暗色本可以用更亮的 500 让按钮更跳，但白字压在 500 上
+     实测只有 3.63:1；主按钮文字是普通字号，必须 ≥4.5，亮度让位于可读性。
+     hover/active 一律走「更深」而非「更亮」，在深色背景上同样是清晰的按压反馈。 */
+  --pk-accent-bg: var(--pk-accent-600);
+  --pk-accent-bg-hover: var(--pk-accent-700);
+  --pk-accent-bg-active: var(--pk-accent-800);
+  --pk-accent-bg-subtle: light-dark(var(--pk-accent-50), oklch(26% 0.05 258));
+  --pk-accent-fg: light-dark(var(--pk-accent-700), var(--pk-accent-300));
+
+  /* --- 反馈状态 --- */
+  --pk-success-fg: light-dark(var(--pk-green-700), var(--pk-green-400));
+  --pk-success-bg: light-dark(var(--pk-green-100), var(--pk-green-900));
+  --pk-success-border: light-dark(var(--pk-green-300), var(--pk-green-700));
+
+  --pk-warning-fg: light-dark(var(--pk-amber-700), var(--pk-amber-400));
+  --pk-warning-bg: light-dark(var(--pk-amber-100), var(--pk-amber-900));
+  --pk-warning-border: light-dark(var(--pk-amber-300), var(--pk-amber-700));
+
+  --pk-danger-fg: light-dark(var(--pk-red-700), var(--pk-red-400));
+  --pk-danger-bg: light-dark(var(--pk-red-100), var(--pk-red-900));
+  --pk-danger-border: light-dark(var(--pk-red-300), var(--pk-red-700));
+  --pk-danger-solid: light-dark(var(--pk-red-600), var(--pk-red-600));
+
+  --pk-info-fg: light-dark(var(--pk-blue-700), var(--pk-blue-400));
+  --pk-info-bg: light-dark(var(--pk-blue-100), var(--pk-blue-900));
+  --pk-info-border: light-dark(var(--pk-blue-300), var(--pk-blue-700));
+
+  /* --- 焦点环：键盘可达性的唯一视觉承载，任何时候不得移除 --- */
+  --pk-focus-ring: 0 0 0 2px var(--pk-bg-surface), 0 0 0 4px var(--pk-border-focus);
+  --pk-focus-ring-inset: inset 0 0 0 1px var(--pk-border-focus);
+
+  /* ==========================================================================
+   * 3. COMPONENT — 领域专用 token
+   * ========================================================================== */
+
+  /* --- HTTP Method：本应用最核心的视觉语言，颜色即语义 ---
+     按「读 / 写 / 改 / 删」的心智分组，明度对齐使一排徽章视觉权重均衡 */
+  --pk-method-get: light-dark(var(--pk-green-700), var(--pk-green-400));
+  --pk-method-post: light-dark(var(--pk-amber-700), var(--pk-amber-400));
+  --pk-method-put: light-dark(var(--pk-blue-700), var(--pk-blue-400));
+  /* 暗色取 violet-400：500 压在选中态背景上实测仅 3.73:1 */
+  --pk-method-patch: light-dark(var(--pk-violet-700), var(--pk-violet-400));
+  --pk-method-delete: light-dark(var(--pk-red-700), var(--pk-red-400));
+  --pk-method-head: light-dark(var(--pk-teal-700), var(--pk-teal-500));
+  --pk-method-options: light-dark(var(--pk-gray-600), var(--pk-gray-400));
+
+  /* --- HTTP 响应状态码 --- */
+  --pk-status-1xx: light-dark(var(--pk-gray-600), var(--pk-gray-400));
+  --pk-status-2xx: light-dark(var(--pk-green-700), var(--pk-green-400));
+  --pk-status-3xx: light-dark(var(--pk-blue-700), var(--pk-blue-400));
+  --pk-status-4xx: light-dark(var(--pk-amber-700), var(--pk-amber-400));
+  --pk-status-5xx: light-dark(var(--pk-red-700), var(--pk-red-400));
+  --pk-status-error: light-dark(var(--pk-red-700), var(--pk-red-400));
+
+  /* --- Git 状态：侧边栏文件标记与 diff 视图 --- */
+  --pk-git-added: light-dark(var(--pk-green-700), var(--pk-green-400));
+  --pk-git-modified: light-dark(var(--pk-amber-700), var(--pk-amber-400));
+  --pk-git-deleted: light-dark(var(--pk-red-700), var(--pk-red-400));
+  --pk-git-renamed: light-dark(var(--pk-blue-700), var(--pk-blue-400));
+  /* 以下三个会出现在选中态背景上（侧栏选中行、状态栏），
+     色阶按「压在 --pk-bg-selected 上仍达 AA」反推 */
+  --pk-git-untracked: light-dark(var(--pk-gray-550), var(--pk-gray-450));
+  --pk-git-conflicted: light-dark(var(--pk-red-600), var(--pk-red-400));
+  --pk-git-ahead: light-dark(var(--pk-accent-700), var(--pk-accent-400));
+  --pk-git-behind: light-dark(var(--pk-violet-600), var(--pk-violet-400));
+
+  /* diff 行背景：低饱和度，保证叠在上面的等宽文字仍然清晰 */
+  --pk-diff-add-bg: light-dark(oklch(95.5% 0.038 152), oklch(26% 0.045 152));
+  --pk-diff-del-bg: light-dark(oklch(95.5% 0.03 25), oklch(26% 0.048 25));
+  --pk-diff-add-gutter: light-dark(oklch(90% 0.07 152), oklch(32% 0.06 152));
+  --pk-diff-del-gutter: light-dark(oklch(90% 0.055 25), oklch(32% 0.065 25));
+
+  /* --- 语法高亮：CodeMirror 主题，色相取自 primitive 保持全局一致 --- */
+  --pk-syn-key: light-dark(var(--pk-accent-700), var(--pk-accent-300));
+  --pk-syn-string: light-dark(var(--pk-green-700), var(--pk-green-400));
+  --pk-syn-number: light-dark(var(--pk-amber-700), var(--pk-amber-300));
+  --pk-syn-boolean: light-dark(var(--pk-violet-700), var(--pk-violet-500));
+  --pk-syn-null: light-dark(var(--pk-gray-500), var(--pk-gray-500));
+  --pk-syn-punct: light-dark(var(--pk-gray-500), var(--pk-gray-500));
+  --pk-syn-comment: light-dark(var(--pk-gray-400), var(--pk-gray-600));
+  --pk-syn-tag: light-dark(var(--pk-red-700), var(--pk-red-400));
+  /* 模板变量 {{baseUrl}} — 需要一眼可辨，用强调色实心底 */
+  --pk-syn-variable-fg: light-dark(var(--pk-accent-800), var(--pk-accent-200));
+  --pk-syn-variable-bg: light-dark(var(--pk-accent-100), oklch(30% 0.065 258));
+  /* 未解析的变量：明确报错而不是静默发出错误请求 */
+  --pk-syn-variable-unresolved-fg: light-dark(var(--pk-red-700), var(--pk-red-300));
+  --pk-syn-variable-unresolved-bg: light-dark(var(--pk-red-100), oklch(30% 0.07 25));
+
+  /* ==========================================================================
+   * 排版
+   * ========================================================================== */
+
+  /* 系统字体栈：不打包 webfont，启动零字体闪烁，且各平台观感原生 */
+  --pk-font-sans:
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
+    "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans SC", sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --pk-font-mono:
+    ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", "Cascadia Code", "Roboto Mono",
+    Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* 字号：工具类应用信息密集，基准比网页小一档，12px 承担主要 UI 文本 */
+  --pk-text-2xs: 0.625rem; /* 10px — 角标、计数 */
+  --pk-text-xs: 0.6875rem; /* 11px — 辅助说明、时间戳 */
+  --pk-text-sm: 0.75rem; /* 12px — 默认 UI 文本 ← 大部分界面 */
+  --pk-text-base: 0.8125rem; /* 13px — 编辑器、表格正文 */
+  --pk-text-md: 0.875rem; /* 14px — 强调文本、输入框 */
+  --pk-text-lg: 1rem; /* 16px — 区块标题 */
+  --pk-text-xl: 1.25rem; /* 20px — 页面标题 */
+  --pk-text-2xl: 1.5rem; /* 24px — 空状态主标题 */
+
+  --pk-leading-none: 1;
+  --pk-leading-tight: 1.25;
+  --pk-leading-snug: 1.4;
+  --pk-leading-normal: 1.5;
+  --pk-leading-code: 1.55; /* 等宽文本需要更松的行距才好扫读 */
+  --pk-leading-relaxed: 1.65;
+
+  --pk-weight-normal: 400;
+  --pk-weight-medium: 500;
+  --pk-weight-semibold: 600;
+  --pk-weight-bold: 700;
+
+  --pk-tracking-tight: -0.01em;
+  --pk-tracking-normal: 0;
+  --pk-tracking-wide: 0.02em;
+  --pk-tracking-caps: 0.045em; /* 全大写标签必须加字距，否则字母粘连 */
+
+  /* ==========================================================================
+   * 间距 — 4px 基准，小尺寸段加密以适配紧凑控件
+   * ========================================================================== */
+  --pk-space-0: 0;
+  --pk-space-px: 1px;
+  --pk-space-0-5: 0.125rem; /* 2px */
+  --pk-space-1: 0.25rem; /* 4px */
+  --pk-space-1-5: 0.375rem; /* 6px */
+  --pk-space-2: 0.5rem; /* 8px */
+  --pk-space-2-5: 0.625rem; /* 10px */
+  --pk-space-3: 0.75rem; /* 12px */
+  --pk-space-4: 1rem; /* 16px */
+  --pk-space-5: 1.25rem; /* 20px */
+  --pk-space-6: 1.5rem; /* 24px */
+  --pk-space-8: 2rem; /* 32px */
+  --pk-space-10: 2.5rem; /* 40px */
+  --pk-space-12: 3rem; /* 48px */
+  --pk-space-16: 4rem; /* 64px */
+
+  /* ==========================================================================
+   * 圆角 — 克制。桌面工具用小圆角显得精准，大圆角显得像消费级 App
+   * ========================================================================== */
+  --pk-radius-none: 0;
+  --pk-radius-xs: 3px;
+  --pk-radius-sm: 4px;
+  --pk-radius-md: 6px; /* 默认：按钮、输入框、卡片 */
+  --pk-radius-lg: 8px;
+  --pk-radius-xl: 12px; /* 模态框 */
+  --pk-radius-full: 9999px;
+
+  /* ==========================================================================
+   * 阴影 — 简约风格下只用于「真正浮起」的层（菜单/弹层/模态），
+   * 平面内的分隔一律交给 border。暗色下阴影几乎不可见，改用边框补足层次。
+   * ========================================================================== */
+  --pk-shadow-xs: light-dark(0 1px 2px oklch(0% 0 0 / 0.05), 0 1px 2px oklch(0% 0 0 / 0.3));
+  --pk-shadow-sm: light-dark(0 1px 3px oklch(0% 0 0 / 0.07), 0 1px 3px oklch(0% 0 0 / 0.4));
+  --pk-shadow-md: light-dark(
+    0 4px 10px -2px oklch(0% 0 0 / 0.08),
+    0 4px 10px -2px oklch(0% 0 0 / 0.45)
+  );
+  --pk-shadow-lg: light-dark(
+    0 12px 28px -6px oklch(0% 0 0 / 0.12),
+    0 12px 28px -6px oklch(0% 0 0 / 0.55)
+  );
+  --pk-shadow-overlay: light-dark(
+    0 16px 48px -12px oklch(0% 0 0 / 0.18),
+    0 16px 48px -12px oklch(0% 0 0 / 0.65)
+  );
+
+  /* ==========================================================================
+   * 动效 — 桌面应用的动画必须比网页更快，否则显得「卡」。
+   * 上限 260ms，绝大多数交互落在 120ms。
+   * ========================================================================== */
+  --pk-duration-instant: 50ms;
+  --pk-duration-fast: 120ms; /* 默认：hover、focus、颜色变化 */
+  --pk-duration-normal: 180ms; /* 展开/收起、tab 切换 */
+  --pk-duration-slow: 260ms; /* 模态入场、面板滑动 */
+
+  --pk-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --pk-ease-out: cubic-bezier(0, 0, 0, 1);
+  --pk-ease-in: cubic-bezier(0.3, 0, 1, 1);
+  --pk-ease-spring: cubic-bezier(0.2, 0.9, 0.3, 1.1);
+
+  /* ==========================================================================
+   * 层级 — 集中管理，禁止在组件里写字面量 z-index
+   * ========================================================================== */
+  --pk-z-base: 0;
+  --pk-z-raised: 1;
+  --pk-z-sticky: 10;
+  --pk-z-drawer: 100;
+  --pk-z-dropdown: 200;
+  --pk-z-overlay: 300;
+  --pk-z-modal: 400;
+  --pk-z-popover: 500;
+  --pk-z-toast: 600;
+  --pk-z-tooltip: 700;
+
+  /* ==========================================================================
+   * 布局尺寸 — 工具型应用的骨架靠固定高度对齐，这些值决定整体密度
+   * ========================================================================== */
+  --pk-h-titlebar: 2.25rem; /* 36px 自定义标题栏 */
+  --pk-h-toolbar: 2.25rem; /* 36px 工具栏 */
+  --pk-h-tab: 2rem; /* 32px 标签页 */
+  --pk-h-statusbar: 1.5rem; /* 24px 底部状态栏（含 git 分支/同步状态） */
+  --pk-h-row: 1.625rem; /* 26px 树节点、表格行 */
+  --pk-h-control-sm: 1.5rem; /* 24px */
+  --pk-h-control-md: 1.75rem; /* 28px ← 默认控件高度 */
+  --pk-h-control-lg: 2rem; /* 32px 主输入框（URL 栏） */
+
+  --pk-w-sidebar: 16.25rem; /* 260px */
+  --pk-w-sidebar-min: 11.25rem; /* 180px */
+  --pk-w-sidebar-max: 30rem; /* 480px */
+  --pk-w-modal-sm: 24rem;
+  --pk-w-modal-md: 32rem;
+  --pk-w-modal-lg: 44rem;
+
+  --pk-border-width: 1px;
+  --pk-border-width-thick: 2px;
+  --pk-indent-tree: 0.875rem; /* 14px 树形每级缩进 */
+  --pk-scrollbar-size: 0.625rem; /* 10px */
+}
+
+/* 主题覆盖：由应用设置写入 <html data-theme="...">，缺省则跟随系统 */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* 尊重系统的降低动效偏好 */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --pk-duration-instant: 0ms;
+    --pk-duration-fast: 0ms;
+    --pk-duration-normal: 0ms;
+    --pk-duration-slow: 0ms;
+  }
+}

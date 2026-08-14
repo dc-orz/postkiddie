@@ -1,0 +1,20 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "主窗口所需的最小权限集合。新增插件时在此显式追加，不要图省事开 *:default 之外的宽泛权限。",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-show",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-title",
+    "core:event:default",
+
+    "opener:allow-open-url",
+
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "dialog:allow-message",
+    "dialog:allow-confirm"
+  ]
+}

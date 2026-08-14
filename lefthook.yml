@@ -1,0 +1,44 @@
+# Git hooks 管理，由 `pnpm install` 触发的 prepare 脚本自动安装。
+#
+# 分工原则：
+#   pre-commit  只做「快且能自动修复」的事（格式化 + 可自动修的 lint），控制在 1 秒内
+#   pre-push    做「慢但必须拦住」的事（类型检查、clippy、测试）
+#   commit-msg  校验提交信息格式
+#
+# 提交速度直接影响提交频率，而频繁小步提交正是这个项目想鼓励的工作方式，
+# 所以 pre-commit 绝不放类型检查或测试。
+
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: "*.{js,jsx,ts,tsx,json,jsonc,css}"
+      run: pnpm exec biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true
+
+    rustfmt:
+      glob: "*.rs"
+      run: cargo fmt --manifest-path src-tauri/Cargo.toml -- {staged_files}
+      stage_fixed: true
+
+    # 只在 design token 变动时跑，耗时 <100ms
+    contrast:
+      glob: "src/styles/tokens.css"
+      run: node scripts/check-contrast.mjs
+
+pre-push:
+  parallel: true
+  commands:
+    typecheck:
+      run: pnpm run typecheck
+
+    rust-lint:
+      run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
+
+    rust-test:
+      run: cargo test --manifest-path src-tauri/Cargo.toml --all-features
+
+commit-msg:
+  commands:
+    conventional:
+      run: bash scripts/check-commit-msg.sh {1}

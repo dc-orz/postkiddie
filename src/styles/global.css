@@ -32,6 +32,12 @@
   }
 
   html {
+    /* 界面缩放的唯一开关：tokens 里的字号与布局尺寸清一色是 rem，
+       改根字号即可让整个界面等比放大，组件无需感知缩放的存在。
+       基准取 100% 而非 16px，这样用户在系统层面调过的默认字号仍然生效。
+       变量由 stores/settings.ts 写入。 */
+    font-size: calc(100% * var(--pk-ui-scale, 1));
+
     /* 桌面应用禁止整页缩放与橡皮筋回弹，否则会露出窗口底色 */
     overscroll-behavior: none;
     -webkit-text-size-adjust: 100%;
@@ -180,10 +186,30 @@
 
 @layer components {
   /* 原生 <dialog> 的遮罩。用它而非自绘弹层：焦点陷阱、ESC 关闭、
-     inert 化背景内容都是浏览器免费给的，自己实现容易漏掉可访问性细节。 */
+     inert 化背景内容都是浏览器免费给的，自己实现容易漏掉可访问性细节。
+
+     这里刻意不加 backdrop-filter: blur()。它作用在 top layer 的 ::backdrop 上时，
+     WebKit 需要为伪元素单独建合成层，而这条路径在 WKWebView 里会渲染成不透明黑块，
+     把弹层一起盖掉——观感上就是「点开弹框整个窗口变黑」。
+     模糊只是锦上添花，不值得为它冒整块界面失效的风险。
+
+     暗色下遮罩也不宜过重：背景本就接近纯黑，再叠一层高不透明度的黑，
+     弹层与被压暗的背景会糊成一片，失去层次。 */
   .pk-dialog::backdrop {
-    background-color: light-dark(oklch(0% 0 0 / 0.28), oklch(0% 0 0 / 0.55));
-    backdrop-filter: blur(2px);
+    background-color: light-dark(oklch(0% 0 0 / 0.32), oklch(0% 0 0 / 0.45));
+  }
+
+  /* 弹层的外观集中在这里，组件只负责各自的宽度。
+     描边用 strong 而非 default：暗色下阴影是黑上加黑，等于不存在，
+     弹层的边界完全靠这一圈比底色亮的描边撑起来。 */
+  .pk-dialog {
+    margin: auto;
+    padding: 0;
+    border: 1px solid var(--pk-border-strong);
+    border-radius: var(--pk-radius-xl);
+    background-color: var(--pk-bg-raised);
+    color: var(--pk-text-primary);
+    box-shadow: var(--pk-shadow-overlay);
   }
 }
 

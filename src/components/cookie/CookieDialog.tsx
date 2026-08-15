@@ -114,10 +114,7 @@ export function CookieDialog({ open, onClose }: CookieDialogProps) {
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();
       }}
-      className={cn(
-        "pk-dialog m-auto w-[52rem] max-w-[92vw] rounded-xl border border-line bg-raised p-0",
-        "text-fg shadow-overlay",
-      )}
+      className="pk-dialog w-[52rem] max-w-[92vw]"
     >
       <div className="flex h-[30rem] max-h-[85vh] flex-col">
         <header className="flex h-toolbar shrink-0 items-center gap-2 border-b border-line-subtle px-3">

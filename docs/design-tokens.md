@@ -58,6 +58,23 @@ Component   --pk-method-get / --pk-status-2xx   领域专用
 代价是最低系统要求提高到 macOS 14.5 / WebKitGTK 2.44，见
 [architecture.md](./architecture.md#5-系统要求)。
 
+### `light-dark()` 只能包颜色
+
+它是**颜色函数**，两个参数都必须是 `<color>`。拿它去包一整条复合值，
+CSS 会判定整个属性无效并静默丢弃——不报错，只是那条声明从此不存在：
+
+```css
+/* 错：整条 box-shadow 被当成参数，结果是 box-shadow: none */
+--pk-shadow-overlay: light-dark(0 16px 48px oklch(0% 0 0 / .18), 0 16px 48px oklch(0% 0 0 / .65));
+
+/* 对：偏移与模糊半径留在外面，只有颜色交给它 */
+--pk-shadow-overlay: 0 16px 48px -12px light-dark(oklch(0% 0 0 / .18), oklch(0% 0 0 / .65));
+```
+
+这条曾让项目里**全部五个阴影 token 长期无声失效**：写法看着合理、构建不报错、
+lint 也查不出，只有去读计算值才会发现 `box-shadow` 一直是 `none`。
+`border`、`background`、`transition` 等复合属性同理。
+
 ## Tailwind 类名映射
 
 `bg-*`、`text-*`、`border-*` 在 Tailwind 4 中**共用** `--color-*` 一个命名空间，
@@ -120,6 +137,27 @@ untracked 灰、conflicted 红（更亮一档以示紧急）。
 
 `h-titlebar` 36px · `h-toolbar` 36px · `h-tab` 32px · `h-statusbar` 24px ·
 `h-row` 26px · `h-control-sm/md/lg` 24/28/32px · `w-sidebar` 260px
+
+### 上表的 px 都是 rem 写的，这是界面缩放的前提
+
+尺寸类 token 一律用 `rem` 表达（`h-row: 1.625rem` 而非 `26px`），
+于是整个界面的缩放就是根字号一个变量的事：
+
+```css
+html { font-size: calc(100% * var(--pk-ui-scale, 1)); }
+```
+
+`stores/settings.ts` 只写 `--pk-ui-scale`，字号、行高、控件高度、侧栏宽度、
+滚动条粗细、CodeMirror 内部排版会一起等比变化，**没有任何组件需要感知缩放的存在**。
+基准取 `100%` 而不是 `16px`，这样用户在系统层面调过的默认字号仍然被尊重。
+
+新增尺寸 token 时写 px 不会报错，但那一处会在缩放时纹丝不动，
+在放大到 125% 的界面里格外扎眼。
+
+默认档位是「自动」，按 `screen.width` 推断（≥2560 → 125%，≥1920 → 110%）。
+判据只看逻辑宽度、不掺 `devicePixelRatio`：系统的显示缩放已经把 DPI 归一化了，
+27" 1080p 与 27" 4K@2x 的逻辑宽度都是 1920，而它们摆在桌上一样大。
+阈值是经验值不是测量结果，用户可以固定一档覆盖它。
 
 **圆角**：默认 `rounded-md` = 6px。桌面工具用小圆角显得精准，
 大圆角显得像消费级 App。模态框用 12px。

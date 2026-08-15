@@ -259,10 +259,7 @@ export function EnvironmentDialog({ open, onClose }: EnvironmentDialogProps) {
         // 点在 dialog 元素本身 = 点在遮罩上；点内容会命中子元素
         if (e.target === dialogRef.current) onClose();
       }}
-      className={cn(
-        "pk-dialog m-auto w-[46rem] max-w-[90vw] rounded-xl border border-line bg-raised p-0",
-        "text-fg shadow-overlay",
-      )}
+      className="pk-dialog w-[46rem] max-w-[90vw]"
     >
       <div className="flex h-[26rem] max-h-[80vh] flex-col">
         <header className="flex h-toolbar shrink-0 items-center border-b border-line-subtle px-3">

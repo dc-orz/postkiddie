@@ -99,6 +99,10 @@ pub trait GitBackend: Send + Sync {
 
     fn status(&self, repo: &Path) -> Result<GitStatus>;
 
+    /// `git mv`：让 git 把它记成一次重命名，而不是「删一个、加一个」。
+    /// 文件未被跟踪时会失败，调用方应退回普通文件移动。
+    fn move_path(&self, repo: &Path, from: &str, to: &str) -> Result<()>;
+
     fn stage(&self, repo: &Path, paths: &[String]) -> Result<()>;
 
     fn unstage(&self, repo: &Path, paths: &[String]) -> Result<()>;

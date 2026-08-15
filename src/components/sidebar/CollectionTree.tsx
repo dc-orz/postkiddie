@@ -1,9 +1,62 @@
 import { ChevronDown, ChevronRight, FileWarning, Folder, FolderOpen } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { MethodBadge } from "@/components/ui/MethodBadge";
 import { cn } from "@/lib/cn";
 import type { FileState, TreeNode } from "@/types/api";
+
+/**
+ * 内联重命名输入框。
+ *
+ * 提交时机取三个：Enter、失焦。Esc 取消。失焦也提交是刻意的——
+ * 用户改完名字直接去点别的地方是最自然的动作，此时丢掉输入会很挫败。
+ */
+function RenameInput({
+  initial,
+  onCommit,
+  onCancel,
+}: {
+  initial: string;
+  onCommit: (name: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  // 用 ref 记住是否已经收尾，避免 Enter 提交后 blur 再触发一次
+  const settled = useRef(false);
+
+  const commit = () => {
+    if (settled.current) return;
+    settled.current = true;
+    const name = value.trim();
+    if (name && name !== initial) onCommit(name);
+    else onCancel();
+  };
+
+  return (
+    <input
+      // biome-ignore lint/a11y/noAutofocus: 进入重命名态的唯一目的就是马上输入，不自动聚焦等于每次都要多点一下
+      autoFocus
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onFocus={(e) => e.currentTarget.select()}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commit();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          settled.current = true;
+          onCancel();
+        }
+        // 方向键等不该冒泡到树的键盘导航
+        e.stopPropagation();
+      }}
+      aria-label="重命名请求"
+      className="min-w-0 flex-1 rounded-sm border border-line-focus bg-surface px-1 text-sm outline-none"
+    />
+  );
+}
 
 /** git 状态 → 单字符标记。用字符而非色块，在密集列表里更安静且能表意。 */
 const GIT_MARK: Record<FileState, { char: string; className: string; label: string }> = {
@@ -23,20 +76,18 @@ interface CollectionTreeProps {
   gitStates: Record<string, FileState>;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** 正在重命名的节点 id；为 null 表示无 */
+  renamingId: string | null;
+  onRenameStart: (id: string) => void;
+  onRenameCommit: (id: string, name: string) => void;
+  onRenameCancel: () => void;
 }
 
-export function CollectionTree({ nodes, gitStates, selectedId, onSelect }: CollectionTreeProps) {
+export function CollectionTree({ nodes, ...rest }: CollectionTreeProps) {
   return (
     <ul className="py-1">
       {nodes.map((node) => (
-        <TreeItem
-          key={node.id}
-          node={node}
-          depth={0}
-          gitStates={gitStates}
-          selectedId={selectedId}
-          onSelect={onSelect}
-        />
+        <TreeItem key={node.id} node={node} depth={0} {...rest} />
       ))}
     </ul>
   );
@@ -47,7 +98,17 @@ interface TreeItemProps extends Omit<CollectionTreeProps, "nodes"> {
   depth: number;
 }
 
-function TreeItem({ node, depth, gitStates, selectedId, onSelect }: TreeItemProps) {
+function TreeItem({ node, depth, ...rest }: TreeItemProps) {
+  // 保留 rest 整体以便原样透传给子节点，省去每加一个回调就要改三处
+  const {
+    gitStates,
+    selectedId,
+    onSelect,
+    renamingId,
+    onRenameStart,
+    onRenameCommit,
+    onRenameCancel,
+  } = rest;
   const [expanded, setExpanded] = useState(depth === 0);
 
   // 缩进用 padding 而非嵌套 margin，这样整行的 hover 高亮能铺满侧栏宽度
@@ -83,14 +144,7 @@ function TreeItem({ node, depth, gitStates, selectedId, onSelect }: TreeItemProp
         {expanded ? (
           <ul>
             {node.children.map((child) => (
-              <TreeItem
-                key={child.id}
-                node={child}
-                depth={depth + 1}
-                gitStates={gitStates}
-                selectedId={selectedId}
-                onSelect={onSelect}
-              />
+              <TreeItem key={child.id} node={child} depth={depth + 1} {...rest} />
             ))}
           </ul>
         ) : null}
@@ -114,9 +168,31 @@ function TreeItem({ node, depth, gitStates, selectedId, onSelect }: TreeItemProp
   const gitState = gitStates[node.id];
   const mark = gitState ? GIT_MARK[gitState] : null;
 
+  if (renamingId === node.id) {
+    return (
+      <li>
+        <div className={cn(rowClass, "bg-selected")} style={indent}>
+          <MethodBadge method={node.method} />
+          <RenameInput
+            initial={node.name}
+            onCommit={(name) => onRenameCommit(node.id, name)}
+            onCancel={onRenameCancel}
+          />
+        </div>
+      </li>
+    );
+  }
+
   return (
     <li>
-      <button type="button" className={rowClass} style={indent} onClick={() => onSelect(node.id)}>
+      <button
+        type="button"
+        className={rowClass}
+        style={indent}
+        onClick={() => onSelect(node.id)}
+        onDoubleClick={() => onRenameStart(node.id)}
+        title="双击重命名"
+      >
         <MethodBadge method={node.method} />
         <span className="pk-truncate flex-1 text-sm">{node.name}</span>
         {mark ? (

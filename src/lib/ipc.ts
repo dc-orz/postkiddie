@@ -83,6 +83,8 @@ export const request = {
   /** 返回新请求的 id。路径拼装与重名消歧都在 Rust 侧完成。 */
   create: (parent: string | null, name: string, method?: HttpMethod) =>
     call<string>("request_create", { parent, name, method: method ?? null }),
+  /** 同时改文件名与 YAML 里的 name，返回新的 id */
+  rename: (id: string, name: string) => call<string>("request_rename", { id, name }),
   remove: (id: string) => call<void>("request_delete", { id }),
   send: (req: HttpRequest, environment?: string) =>
     call<HttpResponse>("request_send", {
@@ -99,6 +101,9 @@ export const request = {
 export const folder = {
   /** 返回新文件夹的 id */
   create: (parent: string | null, name: string) => call<string>("folder_create", { parent, name }),
+  /** 重排某目录下的显示顺序；order 是文件名（含扩展名）数组 */
+  reorder: (folder: string | null, order: string[]) =>
+    call<void>("folder_reorder", { folder, order }),
 };
 
 // ---------------------------------------------------------------------------

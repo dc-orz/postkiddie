@@ -169,6 +169,11 @@ impl GitBackend for GitCli {
         Ok(parse_status(&raw))
     }
 
+    fn move_path(&self, repo: &Path, from: &str, to: &str) -> Result<()> {
+        self.run(repo, ["mv", "--", from, to])?;
+        Ok(())
+    }
+
     fn stage(&self, repo: &Path, paths: &[String]) -> Result<()> {
         if paths.is_empty() {
             return Ok(());

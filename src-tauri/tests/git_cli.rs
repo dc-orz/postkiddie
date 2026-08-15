@@ -272,3 +272,47 @@ fn push_without_remote_fails_fast_instead_of_hanging() {
         started.elapsed(),
     );
 }
+
+/// `git mv` 的意义在于让历史连得上：git 把它记成一次重命名，
+/// 而不是「删掉一个文件、新增另一个」——后者会让 blame 和 log --follow 断掉。
+#[test]
+fn move_path_is_recorded_as_rename() {
+    let (dir, git) = temp_repo();
+    write(dir.path(), "collections/旧名字.yaml", "name: 旧名字\n");
+    git.stage(dir.path(), &["collections/旧名字.yaml".to_owned()])
+        .unwrap();
+    git.commit(dir.path(), "chore: 初始").unwrap();
+
+    git.move_path(
+        dir.path(),
+        "collections/旧名字.yaml",
+        "collections/新名字.yaml",
+    )
+    .unwrap();
+
+    let status = git.status(dir.path()).unwrap();
+    let renamed = status
+        .entries
+        .iter()
+        .find(|e| e.state == FileState::Renamed)
+        .expect("应当被记成重命名");
+
+    assert_eq!(renamed.path, "collections/新名字.yaml");
+    assert_eq!(
+        renamed.original_path.as_deref(),
+        Some("collections/旧名字.yaml")
+    );
+    assert!(renamed.staged, "git mv 会直接把改动放进暂存区");
+}
+
+/// 未被跟踪的文件 git mv 会失败——调用方据此退回普通改名，所以这个行为要固定下来
+#[test]
+fn move_path_fails_for_untracked_file() {
+    let (dir, git) = temp_repo();
+    write(dir.path(), "新建的.yaml", "x\n");
+
+    let err = git
+        .move_path(dir.path(), "新建的.yaml", "改名的.yaml")
+        .expect_err("未跟踪的文件应当 mv 失败");
+    assert_eq!(err.kind(), "git");
+}

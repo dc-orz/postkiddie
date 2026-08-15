@@ -7,12 +7,12 @@ use tauri::State;
 use crate::{
     AppState,
     domain::model::{HttpMethod, HttpRequest},
-    error::Result,
+    error::{Error, Result},
     http::{HttpResponse, VariableScope, execute},
     storage::{
         Workspace,
         paths::{resolve_within, sanitize_file_name, to_relative_slash},
-        tree::{REQUEST_EXT, read_request, write_request},
+        tree::{REQUEST_EXT, read_folder_meta, read_request, write_folder_meta, write_request},
     },
 };
 
@@ -65,6 +65,101 @@ pub async fn request_create(
     let id = to_relative_slash(&ws.root, &path)?;
     tracing::info!(id = %id, "已新建请求");
     Ok(id)
+}
+
+/// 重命名请求：同时改文件名与 YAML 里的 `name`，返回新的 id。
+///
+/// 两者必须一起改。只改 `name` 会让文件名与显示名长期背离，
+/// 而文件名正是这个项目里请求的身份——git 历史、diff、别人 clone 后看到的都是它。
+///
+/// 用 `git mv` 而非普通重命名：让 git 直接把它记成一次重命名而非「删一个加一个」，
+/// 历史与 blame 才连得上。git 不可用时退回普通改名，不阻塞用户。
+#[tauri::command]
+pub async fn request_rename(
+    state: State<'_, AppState>,
+    id: String,
+    name: String,
+) -> Result<String> {
+    let ws = state.workspace()?;
+    let old_path = resolve_within(&ws.root, &id)?;
+
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(Error::Invalid("请求名不能为空".to_owned()));
+    }
+
+    let dir = old_path
+        .parent()
+        .ok_or_else(|| Error::Invalid("无法确定所在目录".to_owned()))?;
+    let new_path = unique_path(dir, &sanitize_file_name(trimmed), REQUEST_EXT);
+
+    // 文件内容里的 name 也要跟着改，否则下次扫描出来的显示名又变回去了
+    let mut request = read_request(&old_path)?;
+    request.name = trimmed.to_owned();
+
+    if new_path != old_path {
+        write_request(&old_path, &request)?;
+        move_file(state.git.as_ref(), &ws.root, &old_path, &new_path)?;
+        rename_in_folder_order(dir, &old_path, &new_path)?;
+    } else {
+        write_request(&old_path, &request)?;
+    }
+
+    let new_id = to_relative_slash(&ws.root, &new_path)?;
+    tracing::info!(from = %id, to = %new_id, "已重命名请求");
+    Ok(new_id)
+}
+
+/// 移动文件。优先 `git mv` 以保留重命名历史，失败则退回普通移动。
+fn move_file(git: &dyn crate::git::GitBackend, repo: &Path, from: &Path, to: &Path) -> Result<()> {
+    let (Ok(rel_from), Ok(rel_to)) = (to_relative_slash(repo, from), to_relative_slash(repo, to))
+    else {
+        std::fs::rename(from, to)?;
+        return Ok(());
+    };
+
+    // 未被 git 跟踪的新文件 git mv 会失败，这时普通改名才是对的
+    if git.move_path(repo, &rel_from, &rel_to).is_err() {
+        std::fs::rename(from, to)?;
+    }
+    Ok(())
+}
+
+/// 若目录的 `_folder.yaml` 里记了旧文件名，同步换成新的，否则顺序会悄悄丢失。
+fn rename_in_folder_order(dir: &Path, old_path: &Path, new_path: &Path) -> Result<()> {
+    let (Some(old_name), Some(new_name)) = (
+        old_path.file_name().and_then(|n| n.to_str()),
+        new_path.file_name().and_then(|n| n.to_str()),
+    ) else {
+        return Ok(());
+    };
+
+    let mut meta = read_folder_meta(dir)?;
+    let Some(slot) = meta.order.iter_mut().find(|n| n.as_str() == old_name) else {
+        return Ok(());
+    };
+
+    *slot = new_name.to_owned();
+    write_folder_meta(dir, &meta)
+}
+
+/// 重排某个目录下的显示顺序。
+///
+/// 顺序集中写在 `_folder.yaml` 的 `order` 里，所以一次拖拽只产生一处 diff——
+/// 这正是当初不在每个请求里放 `seq` 序号的原因。
+#[tauri::command]
+pub async fn folder_reorder(
+    state: State<'_, AppState>,
+    folder: Option<String>,
+    order: Vec<String>,
+) -> Result<()> {
+    let ws = state.workspace()?;
+    let dir = resolve_parent(&ws, folder.as_deref())?;
+
+    let mut meta = read_folder_meta(&dir)?;
+    meta.order = order;
+    write_folder_meta(&dir, &meta)?;
+    Ok(())
 }
 
 /// 新建文件夹，返回其 id（相对工作区根的路径）。

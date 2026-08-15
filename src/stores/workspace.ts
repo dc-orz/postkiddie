@@ -33,6 +33,8 @@ interface WorkspaceState {
   createRequest: (parent: string | null, name: string, method?: HttpMethod) => Promise<string>;
   /** 新建文件夹，返回其 id */
   createFolder: (parent: string | null, name: string) => Promise<string>;
+  /** 重命名请求，返回新的 id（文件名会跟着变） */
+  renameRequest: (id: string, name: string) => Promise<string>;
   deleteRequest: (id: string) => Promise<void>;
 
   saveEnvironment: (name: string, environment: Environment) => Promise<void>;
@@ -125,6 +127,12 @@ export const useWorkspace = create<WorkspaceState>()(
           const id = await folderIpc.create(parent, name);
           await get().refresh();
           return id;
+        },
+
+        renameRequest: async (id, name) => {
+          const newId = await requestIpc.rename(id, name);
+          await get().refresh();
+          return newId;
         },
 
         deleteRequest: async (id) => {

@@ -56,6 +56,7 @@ export function Sidebar() {
   const refresh = useWorkspace((s) => s.refresh);
   const createRequest = useWorkspace((s) => s.createRequest);
   const createFolder = useWorkspace((s) => s.createFolder);
+  const renameRequest = useWorkspace((s) => s.renameRequest);
 
   const selectedId = useRequest((s) => s.id);
   const select = useRequest((s) => s.select);
@@ -68,6 +69,7 @@ export function Sidebar() {
 
   const [containerRef, size] = useElementSize<HTMLDivElement>();
   const [refreshing, setRefreshing] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
 
   // 分割条按「上方（集合树）的高度」工作，因此这里做一次换算：
   // 向下拖 → 树变高 → git 面板变矮，与手上的方向一致。
@@ -92,6 +94,17 @@ export function Sidebar() {
       await select(id);
     } catch (error) {
       await showError(error instanceof Error ? error.message : String(error), "新建请求失败");
+    }
+  }
+
+  async function handleRename(id: string, name: string) {
+    setRenamingId(null);
+    try {
+      const newId = await renameRequest(id, name);
+      // 文件名变了 = id 变了，当前打开的那个要跟着切过去，否则会指向一个已不存在的路径
+      if (selectedId === id) await select(newId);
+    } catch (error) {
+      await showError(error instanceof Error ? error.message : String(error), "重命名失败");
     }
   }
 
@@ -143,6 +156,10 @@ export function Sidebar() {
               gitStates={gitStates}
               selectedId={selectedId}
               onSelect={(id) => void select(id)}
+              renamingId={renamingId}
+              onRenameStart={setRenamingId}
+              onRenameCommit={(id, name) => void handleRename(id, name)}
+              onRenameCancel={() => setRenamingId(null)}
             />
           )}
         </nav>

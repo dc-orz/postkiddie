@@ -94,6 +94,29 @@ CLI 实现里有两个必须处理的坑，都写在 `git/cli.rs` 的注释里�
 用 `rustls-tls-native-roots` 而非纯 rustls：读取系统根证书，
 企业自签 CA 装在钥匙串里时才能直接工作。
 
+### Cookie 与登录态同步
+
+需求是「把浏览器里已登录的会话拿进来调接口」。三条路：
+
+| 方案 | 取舍 |
+|---|---|
+| **内置登录窗口** ✅ | 开一个属于本应用的 WebView 加载目标站点，用户在里面正常登录，cookie 天然属于这个 WebView，`cookies_for_url` 读出即可。无需任何特殊权限，三端一致，SSO/验证码/双因子全都照常工作 |
+| **粘贴导入** ✅（兜底） | 接受 DevTools 的「Copy as cURL」或裸 Cookie 头。零门槛、永远可用 |
+| 读浏览器的 Cookie 数据库 ❌ | 技术上做得到，但代价与风险都不成立 |
+
+最后一条值得说清楚为什么不做。Chrome 的 cookie 存在 SQLite 里，值用 Keychain（macOS）
+或 DPAPI（Windows）中的密钥加密；Safari 是私有二进制格式且需要完全磁盘访问权限。
+即便逐个平台实现出来：
+
+- Chrome 127+ 在 Windows 上加了 App-Bound Encryption，这条路基本被封死
+- 每次读取都要弹系统授权，体验并不比「在我们的窗口里登录一次」更好
+- **「扫描用户的浏览器凭证库」正是 infostealer 的典型行为**，杀软会直接报毒——
+  一个 API 调试工具不该要求用户在这种事情上替它做信任判断
+
+匹配规则严格按 RFC 6265 实现并单测覆盖（`domain/cookie.rs`），
+因为这里的每一条边界都对应过真实的越权事故：域后缀必须落在点边界上，
+否则 `example.com` 的会话会被发给 `notexample.com`。
+
 ## 3. 分层
 
 ```

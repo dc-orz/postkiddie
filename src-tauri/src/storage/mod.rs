@@ -22,6 +22,7 @@
 //! 没有数据库、没有缓存索引：目录内容就是唯一事实来源。用户在 IDE 里直接编辑、
 //! 或 `git pull` 拉入他人改动后，重新扫描即得到正确状态，不存在需要修复的不一致。
 
+pub mod cookies;
 pub mod paths;
 pub mod tree;
 
@@ -37,6 +38,8 @@ use crate::{
 pub const WORKSPACE_FILE: &str = "postkiddie.yaml";
 pub const PRIVATE_DIR: &str = ".postkiddie";
 pub const SECRETS_FILE: &str = "secrets.yaml";
+/// Cookie 是登录凭证，与密钥同级：只存本机，永不入库
+pub const COOKIES_FILE: &str = "cookies.yaml";
 
 #[derive(Debug, Clone)]
 pub struct Workspace {
@@ -213,6 +216,25 @@ impl Workspace {
         if secrets.environments.remove(name).is_some() {
             self.write_secrets(&secrets)?;
         }
+        Ok(())
+    }
+
+    // -- Cookie ------------------------------------------------------------
+
+    pub fn read_cookies(&self) -> Result<cookies::CookieJar> {
+        let path = self.private_path().join(COOKIES_FILE);
+        if !path.exists() {
+            return Ok(cookies::CookieJar::default());
+        }
+        let raw = std::fs::read_to_string(&path)?;
+        Ok(serde_norway::from_str(&raw)?)
+    }
+
+    pub fn write_cookies(&self, jar: &cookies::CookieJar) -> Result<()> {
+        let dir = self.private_path();
+        std::fs::create_dir_all(&dir)?;
+        let yaml = serde_norway::to_string(jar)?;
+        std::fs::write(dir.join(COOKIES_FILE), yaml)?;
         Ok(())
     }
 

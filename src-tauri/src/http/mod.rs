@@ -3,5 +3,5 @@
 pub mod executor;
 pub mod interpolate;
 
-pub use executor::{ClientPool, HttpResponse, ResponseBody, execute};
+pub use executor::{ClientPool, ExecuteOutcome, HttpResponse, ResponseBody, execute};
 pub use interpolate::VariableScope;

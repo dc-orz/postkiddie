@@ -177,6 +177,43 @@ environments:
 缺失就自动补上。`git pull` 到别人建的仓库、或有人手工改过 `.gitignore`
 都可能让这行丢失，而它一旦丢失，本地密钥就会在下一次提交时被推到远端。
 
+## Cookie 与登录态
+
+Cookie 存在 `.postkiddie/cookies.yaml`，与密钥同级、同样被 gitignore。
+**这一点没有商量余地**：cookie 就是登录凭证，推到远端等同于把账号交出去，
+而 git 历史里的东西撤不干净。
+
+```yaml
+cookies:
+  - name: sid
+    value: abc123...
+    domain: example.com      # 不含前导点
+    path: /
+    hostOnly: true           # 缺省 Domain 属性时只匹配该主机，不下发给子域
+    secure: true
+    expires: 2026-10-21T07:28:00Z
+```
+
+发请求时按 RFC 6265 匹配：域要落在点边界上（`example.com` 的 cookie 不会发给
+`notexample.com`）、路径要落在段边界上（`/api` 不匹配 `/apirandom`）、
+`secure` 的不随明文 HTTP 发出、过期的不发。响应里的 `Set-Cookie` 会自动回存，
+所以「先调登录接口、再调业务接口」这条链路天然成立。
+
+请求设置里的**携带 Cookie** 开关关闭后是完整隔离：既不附带已存的，
+也不保存响应返回的——否则「以未登录身份做对照」反而会污染真实会话。
+
+### 三种获取方式
+
+1. **内置登录窗口**（标题栏的 Cookie 按钮）：填入站点地址、点「打开登录」，
+   在弹出的窗口里正常登录（SSO、验证码、双因子都可以，那就是个真浏览器），
+   回来点「收取」。
+2. **粘贴导入**：浏览器 DevTools 里右键请求「Copy as cURL」，整条粘进来即可，
+   也接受裸的 `sid=abc; csrf=xyz`。
+3. **自动回存**：调用登录接口后，响应的 `Set-Cookie` 自动进罐子。
+
+**不支持直接读取浏览器的 Cookie 数据库**，这是有意的，理由见
+[architecture.md](./architecture.md#cookie-与登录态同步)。
+
 ## 变量插值
 
 `{{name}}` 语法。优先级由低到高：

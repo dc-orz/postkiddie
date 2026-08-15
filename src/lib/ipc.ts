@@ -12,6 +12,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   BranchInfo,
   CommitInfo,
+  CookieGroup,
   Environment,
   GitStatus,
   HttpMethod,
@@ -113,6 +114,25 @@ export const environment = {
     call<void>("environment_save", { name, environment: env }),
   create: (name: string) => call<Environment>("environment_create", { name }),
   remove: (name: string) => call<void>("environment_delete", { name }),
+};
+
+// ---------------------------------------------------------------------------
+// Cookie
+// ---------------------------------------------------------------------------
+
+export const cookie = {
+  list: () => call<CookieGroup[]>("cookie_list"),
+  remove: (name: string, domain: string, path: string) =>
+    call<void>("cookie_delete", { name, domain, path }),
+  /** 清掉某个域及其子域的全部 cookie，相当于退出登录 */
+  clearDomain: (domain: string) => call<void>("cookie_clear_domain", { domain }),
+  /** raw 可以是 Cookie 头的值，也可以是整条 curl 命令。返回导入条数。 */
+  import: (url: string, raw: string) => call<number>("cookie_import", { url, raw }),
+  /** 打开内置登录窗口 */
+  loginOpen: (url: string) => call<void>("cookie_login_open", { url }),
+  /** 从登录窗口收取 cookie，返回条数 */
+  capture: (url: string, closeWindow = true) =>
+    call<number>("cookie_capture", { url, closeWindow }),
 };
 
 // ---------------------------------------------------------------------------

@@ -14,9 +14,15 @@ use base64::Engine as _;
 use serde::Serialize;
 
 use crate::{
-    domain::model::{ApiKeyPlacement, Auth, HttpMethod, HttpRequest, KeyValue, RequestBody},
+    domain::{
+        cookie::Cookie,
+        model::{ApiKeyPlacement, Auth, HttpMethod, HttpRequest, KeyValue, RequestBody},
+    },
     error::{Error, Result},
-    storage::paths::resolve_within,
+    storage::{
+        cookies::{CookieJar, parse_set_cookie},
+        paths::resolve_within,
+    },
 };
 
 use super::interpolate::VariableScope;
@@ -117,13 +123,28 @@ impl ClientPool {
 // 执行
 // ---------------------------------------------------------------------------
 
+/// 一次执行的完整结果。
+///
+/// 把「响应」与「响应带来的 cookie」分开返回，而不是在这里直接写盘：
+/// executor 不碰文件系统，是否持久化由命令层决定，这样它才好被单测覆盖。
+#[derive(Debug)]
+pub struct ExecuteOutcome {
+    pub response: HttpResponse,
+    /// 响应中 `Set-Cookie` 解析出的 cookie
+    pub received_cookies: Vec<Cookie>,
+}
+
 /// 发送一个请求。`scope` 需已按优先级合并完毕，`workspace_root` 用于解析 body 引用的文件。
+///
+/// `jar` 提供要自动附带的 cookie；`now` 是判断过期用的当前时刻（RFC 3339）。
 pub async fn execute(
     pool: &ClientPool,
     request: &HttpRequest,
     scope: &VariableScope,
     workspace_root: &Path,
-) -> Result<HttpResponse> {
+    jar: &CookieJar,
+    now: &str,
+) -> Result<ExecuteOutcome> {
     let settings = &request.settings;
 
     let client = pool.get(ClientKey {
@@ -142,8 +163,22 @@ pub async fn execute(
         builder = builder.timeout(Duration::from_millis(settings.timeout_ms));
     }
 
+    let mut user_set_cookie_header = false;
     for header in request.headers.iter().filter(|h| h.enabled) {
-        builder = builder.header(scope.expand(&header.name)?, scope.expand(&header.value)?);
+        let name = scope.expand(&header.name)?;
+        if name.eq_ignore_ascii_case("cookie") {
+            user_set_cookie_header = true;
+        }
+        builder = builder.header(name, scope.expand(&header.value)?);
+    }
+
+    // 自动附带 cookie。用户手写了 Cookie 头就不插手——那是明确的意图表达，
+    // 何况一个请求只能有一个 Cookie 头，硬合并只会产生难以预料的结果。
+    if settings.send_cookies
+        && !user_set_cookie_header
+        && let Some(value) = jar.header_for(&url, Some(now))
+    {
+        builder = builder.header(reqwest::header::COOKIE, value);
     }
 
     builder = apply_auth(builder, &request.auth, scope)?;
@@ -167,17 +202,31 @@ pub async fn execute(
         .and_then(|v| v.to_str().ok())
         .map(str::to_owned);
 
+    // Set-Cookie 可以出现多次，必须用 get_all。
+    // 以最终 URL 为基准解析：跟随重定向后，cookie 属于落地的那个域。
+    let cookie_base: url::Url = final_url.parse().unwrap_or_else(|_| url.clone());
+    let received_cookies: Vec<Cookie> = response
+        .headers()
+        .get_all(reqwest::header::SET_COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .filter_map(|raw| parse_set_cookie(raw, &cookie_base, now))
+        .collect();
+
     let bytes = response.bytes().await?;
     let elapsed_ms = started.elapsed().as_millis() as u64;
 
-    Ok(HttpResponse {
-        status: status.as_u16(),
-        status_text: status.canonical_reason().unwrap_or("").to_owned(),
-        final_url,
-        headers,
-        size_bytes: bytes.len() as u64,
-        body: decode_body(&bytes, content_type.as_deref()),
-        elapsed_ms,
+    Ok(ExecuteOutcome {
+        response: HttpResponse {
+            status: status.as_u16(),
+            status_text: status.canonical_reason().unwrap_or("").to_owned(),
+            final_url,
+            headers,
+            size_bytes: bytes.len() as u64,
+            body: decode_body(&bytes, content_type.as_deref()),
+            elapsed_ms,
+        },
+        received_cookies,
     })
 }
 

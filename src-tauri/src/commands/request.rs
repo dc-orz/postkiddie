@@ -113,9 +113,25 @@ pub async fn request_send(
 ) -> Result<HttpResponse> {
     let ws = state.workspace()?;
     let scope = build_scope(&ws, environment.as_deref())?;
+    let mut jar = ws.read_cookies()?;
+    let now = jiff::Timestamp::now().to_string();
 
     tracing::debug!(method = request.method.as_str(), url = %request.url, "发送请求");
-    execute(&state.http, &request, &scope, &ws.root).await
+    let outcome = execute(&state.http, &request, &scope, &ws.root, &jar, &now).await?;
+
+    // 回存响应带来的 cookie，让「先调登录接口、再调业务接口」这条链路自动成立。
+    // send_cookies 关闭时不回存：那是完整隔离，不该反过来污染真实会话。
+    if request.settings.send_cookies && !outcome.received_cookies.is_empty() {
+        let count = outcome.received_cookies.len();
+        for cookie in outcome.received_cookies {
+            jar.upsert(cookie);
+        }
+        jar.purge_expired(&now);
+        ws.write_cookies(&jar)?;
+        tracing::debug!(count, "已保存响应返回的 Cookie");
+    }
+
+    Ok(outcome.response)
 }
 
 /// 在不发送的前提下，列出请求里引用了但当前无法解析的变量。

@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS: RequestSettings = {
   maxRedirects: 10,
   verifyTls: true,
   decompress: true,
+  sendCookies: true,
 };
 
 function Row({
@@ -133,6 +134,17 @@ export function SettingsTab({ settings, onChange }: SettingsTabProps) {
           label="自动解压响应"
           checked={settings.decompress}
           onChange={(decompress) => patch({ decompress })}
+        />
+      </Row>
+
+      <Row
+        label="携带 Cookie"
+        hint="关闭后既不附带已保存的 Cookie，也不保存响应返回的 Cookie——用于以未登录身份做对照。"
+      >
+        <Toggle
+          label="携带 Cookie"
+          checked={settings.sendCookies}
+          onChange={(sendCookies) => patch({ sendCookies })}
         />
       </Row>
     </div>

@@ -1,6 +1,7 @@
-import { ChevronDown, Layers, Monitor, Moon, Settings2, Sun } from "lucide-react";
+import { ChevronDown, Cookie, Layers, Monitor, Moon, Settings2, Sun } from "lucide-react";
 import { useState } from "react";
 
+import { CookieDialog } from "@/components/cookie/CookieDialog";
 import { EnvironmentDialog } from "@/components/environment/EnvironmentDialog";
 import { cn } from "@/lib/cn";
 import { isMacOS } from "@/lib/platform";
@@ -28,6 +29,7 @@ export function TitleBar() {
   const setActiveEnvironment = useWorkspace((s) => s.setActiveEnvironment);
 
   const [envDialogOpen, setEnvDialogOpen] = useState(false);
+  const [cookieDialogOpen, setCookieDialogOpen] = useState(false);
 
   return (
     <header
@@ -92,7 +94,21 @@ export function TitleBar() {
         <Settings2 size={12} strokeWidth={2} />
       </button>
 
+      <button
+        type="button"
+        title="Cookie 与登录态"
+        aria-label="Cookie 与登录态"
+        onClick={() => setCookieDialogOpen(true)}
+        className={cn(
+          "pk-no-drag flex size-control-sm items-center justify-center rounded-md border border-line",
+          "text-fg-muted transition-colors duration-fast hover:bg-hover hover:text-fg",
+        )}
+      >
+        <Cookie size={12} strokeWidth={2} />
+      </button>
+
       <EnvironmentDialog open={envDialogOpen} onClose={() => setEnvDialogOpen(false)} />
+      <CookieDialog open={cookieDialogOpen} onClose={() => setCookieDialogOpen(false)} />
 
       <div className="pk-no-drag flex items-center rounded-md border border-line p-0.5">
         {MODES.map(({ mode: m, icon: Icon, label }) => (

@@ -78,6 +78,8 @@ export interface RequestSettings {
   maxRedirects: number;
   verifyTls: boolean;
   decompress: boolean;
+  /** 关闭后既不附带已存 cookie，也不保存响应返回的 cookie */
+  sendCookies: boolean;
 }
 
 export interface HttpRequest {
@@ -141,6 +143,29 @@ export interface EnvVariable {
 export interface Environment {
   name: string;
   variables: EnvVariable[];
+}
+
+// ---------------------------------------------------------------------------
+// Cookie
+// ---------------------------------------------------------------------------
+
+export interface Cookie {
+  name: string;
+  value: string;
+  /** 不含前导点。是否匹配子域由 hostOnly 表达 */
+  domain: string;
+  path: string;
+  /** true = 只匹配精确主机 */
+  hostOnly?: boolean;
+  secure?: boolean;
+  httpOnly?: boolean;
+  /** RFC 3339；缺省表示会话 cookie */
+  expires?: string;
+}
+
+export interface CookieGroup {
+  domain: string;
+  cookies: Cookie[];
 }
 
 // ---------------------------------------------------------------------------

@@ -243,6 +243,14 @@ pub struct RequestSettings {
     /// 关闭后 `Accept-Encoding` 不声明压缩，便于观察服务端原始字节
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub decompress: bool,
+
+    /// 是否参与 Cookie 机制。
+    ///
+    /// 关闭后**既不附带**已存的 cookie，**也不保存**响应返回的 cookie——
+    /// 是完整的隔离而非只单向关闭。关掉它的典型场景是「以未登录身份访问同一接口」
+    /// 做对照，此时若响应里的 Set-Cookie 仍被存下来，反而会污染真实会话。
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub send_cookies: bool,
 }
 
 impl Default for RequestSettings {
@@ -253,6 +261,7 @@ impl Default for RequestSettings {
             max_redirects: default_max_redirects(),
             verify_tls: true,
             decompress: true,
+            send_cookies: true,
         }
     }
 }
@@ -537,6 +546,7 @@ mod tests {
                 max_redirects: 2,
                 verify_tls: false,
                 decompress: false,
+                send_cookies: false,
             },
             ..Default::default()
         };

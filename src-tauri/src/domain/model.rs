@@ -3,7 +3,14 @@
 //! 这些结构体的**字段声明顺序即 YAML 输出顺序**，改动顺序会让所有文件产生 diff，
 //! 因此调整前请确认确有必要。
 //!
-//! 三条贯穿性约定：
+//! 四条贯穿性约定：
+//!
+//! 0. **一律 `rename_all = "camelCase"`。** 这些结构同时是磁盘 YAML 的 schema
+//!    和 IPC 的传输格式，两端必须完全一致。选 camelCase 而非 Rust 惯用的
+//!    snake_case，是因为它同时要被 TypeScript 读写——让磁盘迁就前端一次，
+//!    好过在 IPC 边界上做一层易漏的转换。漏加会静默丢字段：
+//!    前端写 `timeoutMs`、后端读 `timeout_ms`，`#[serde(default)]` 会把它当没填，
+//!    用户改的超时设置就这么无声消失了。**新增结构时不要忘。**
 //!
 //! 1. **不使用 `deny_unknown_fields`。** 团队成员的客户端版本必然参差不齐，
 //!    老版本读到新版本写入的字段时应当忽略而不是报错。代价是拼错的字段会被静默丢弃，
@@ -26,6 +33,7 @@ use serde::{Deserialize, Serialize};
 /// `enabled: false` 表示「保留但不发送」，等价于 Postman 里取消勾选。
 /// 这比直接删除更实用：调试用的 header 可以留在文件里随时打开。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct KeyValue {
     pub name: String,
 
@@ -83,7 +91,11 @@ impl HttpMethod {
 /// 原文逐行落盘，无转义，diff 可以精确到 JSON 的某一行。
 /// 这正是选 YAML 而非 JSON 作为存储格式的核心理由。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-#[serde(tag = "type", rename_all = "kebab-case")]
+#[serde(
+    tag = "type",
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase"
+)]
 pub enum RequestBody {
     #[default]
     None,
@@ -137,6 +149,7 @@ pub enum RequestBody {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MultipartField {
     pub name: String,
 
@@ -162,7 +175,11 @@ pub struct MultipartField {
 /// 认证配置。`Inherit` 表示沿用父文件夹 / 集合的设置，
 /// 这是最常用的情形——整个集合共用一套 token，不该在每个请求里重复。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(tag = "type", rename_all = "kebab-case")]
+#[serde(
+    tag = "type",
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase"
+)]
 pub enum Auth {
     #[default]
     Inherit,
@@ -201,6 +218,7 @@ pub enum ApiKeyPlacement {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RequestSettings {
     /// 毫秒。0 表示不超时。
     #[serde(
@@ -249,6 +267,7 @@ impl Default for RequestSettings {
 /// 好处是重命名/移动的语义天然正确、复制文件不会撞 ID、
 /// 也不存在两个人各自新建请求生成同一 UUID 的合并冲突。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct HttpRequest {
     pub name: String,
 
@@ -291,6 +310,7 @@ pub struct HttpRequest {
 ///
 /// 未列入 `order` 的条目按文件名排在其后——外部新建的文件不会消失，也不需要立即维护顺序。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct FolderMeta {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -316,6 +336,7 @@ pub struct FolderMeta {
 
 /// 一个环境 = `environments/<name>.yaml`。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct Environment {
     pub name: String,
 
@@ -329,6 +350,7 @@ pub struct Environment {
 /// 落盘时被清空，真实值存放于工作区内被 gitignore 的 `.postkiddie/secrets.yaml`。
 /// 这样团队共享的是「有哪些密钥要填」的契约，而不是密钥本身。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EnvVariable {
     pub name: String,
 
@@ -351,6 +373,7 @@ pub struct EnvVariable {
 
 /// 工作区根目录下的 `postkiddie.yaml`，标记「这是一个 PostKiddie 工作区」。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceConfig {
     /// schema 版本。破坏性变更时递增，客户端据此决定迁移或提示升级。
     #[serde(default = "default_schema_version")]
@@ -465,6 +488,73 @@ mod tests {
         let yaml = "name: t\nmethod: POST\nurl: /x\nfutureFeature: {a: 1}\n";
         let req: HttpRequest = serde_norway::from_str(yaml).expect("应当容忍未知字段");
         assert_eq!(req.method, HttpMethod::Post);
+    }
+
+    /// 多词字段必须以 camelCase 落盘。
+    ///
+    /// 这是回归测试：早先 `RequestSettings` 等结构漏了 `rename_all`，
+    /// 于是后端写 `timeout_ms`、前端读 `timeoutMs`，双方都不报错，
+    /// 只是用户改的超时与 TLS 开关每次保存后都悄悄变回默认值。
+    #[test]
+    fn multi_word_fields_serialize_as_camel_case() {
+        let req = HttpRequest {
+            name: "t".to_owned(),
+            method: HttpMethod::Post,
+            url: "/x".to_owned(),
+            settings: RequestSettings {
+                timeout_ms: 5_000,
+                verify_tls: false,
+                max_redirects: 3,
+                ..Default::default()
+            },
+            body: RequestBody::Text {
+                content: "a,b\n".to_owned(),
+                content_type: Some("text/csv".to_owned()),
+            },
+            ..Default::default()
+        };
+
+        let yaml = serde_norway::to_string(&req).expect("序列化失败");
+
+        for camel in ["timeoutMs:", "verifyTls:", "maxRedirects:", "contentType:"] {
+            assert!(yaml.contains(camel), "缺少 {camel}\n{yaml}");
+        }
+        for snake in ["timeout_ms", "verify_tls", "max_redirects", "content_type"] {
+            assert!(!yaml.contains(snake), "残留 snake_case 键 {snake}\n{yaml}");
+        }
+    }
+
+    /// 与上一条配套：camelCase 写出去之后必须还能读回来，且值不丢
+    #[test]
+    fn camel_case_settings_round_trip() {
+        let original = HttpRequest {
+            name: "t".to_owned(),
+            method: HttpMethod::Get,
+            url: "/x".to_owned(),
+            settings: RequestSettings {
+                timeout_ms: 1_234,
+                follow_redirects: false,
+                max_redirects: 2,
+                verify_tls: false,
+                decompress: false,
+            },
+            ..Default::default()
+        };
+
+        let yaml = serde_norway::to_string(&original).expect("序列化失败");
+        let loaded: HttpRequest = serde_norway::from_str(&yaml).expect("反序列化失败");
+
+        assert_eq!(loaded.settings, original.settings);
+        assert_eq!(loaded, original);
+    }
+
+    /// 工作区配置同样过 IPC，键名也必须一致
+    #[test]
+    fn workspace_config_uses_camel_case() {
+        let yaml = serde_norway::to_string(&WorkspaceConfig::default()).expect("序列化失败");
+        assert!(yaml.contains("collectionsDir:"), "{yaml}");
+        assert!(yaml.contains("environmentsDir:"), "{yaml}");
+        assert!(!yaml.contains("collections_dir"), "{yaml}");
     }
 
     /// 多行 body 必须以 block scalar 落盘，保证 diff 能精确到 JSON 的某一行

@@ -1,0 +1,45 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!--
+    PostKiddie 应用图标。
+
+    一条向右上射出的轨迹，线上串着两个提交节点：轨迹是发出去的请求，
+    节点是它在 git 里留下的版本。产品的两件事收在一个形里。
+
+    节点刻意做成一实一空——git 的提交图就是这么画的，
+    而且光靠「线上鼓个包」读不出节点，必须让它比线粗得多、并且穿透。
+    空心那颗的底色圆用的是同一个 userSpaceOnUse 渐变，
+    所以它和背景严丝合缝，看上去就是线从环中穿过。
+
+    所有元素共线，缩到 32px 仍读得出「一条带箭头的斜线」；
+    分叉、环绕这类构图在那个尺寸下必糊成一团。
+
+    画布 1024 但底板只有 824 并居中：macOS 图标网格要求四周留白，
+    满幅的圆角矩形摆进 Dock 会明显比邻居大一圈。
+  -->
+  <defs>
+    <linearGradient id="pk-bg" x1="100" y1="100" x2="924" y2="924" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6E56F8"/>
+      <stop offset="1" stop-color="#2F6BF0"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#pk-bg)"/>
+
+  <!-- 坐标已含居中修正，不用 transform 包一层：那会连 userSpaceOnUse 的渐变一起平移，
+       空心节点的底色圆就对不上背景了 -->
+  <g stroke="#FFFFFF" stroke-width="46" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- 主线止于 695,329 而非箭头的角点：三笔汇于一点时，圆角 join 会把交汇处
+         堆成一个圆角方块，读起来像面小旗子而不是箭头。留 8px 由圆头补齐。 -->
+    <path d="M343 681L695 329"/>
+    <!-- 两翼长 110（约 2.4 倍线宽）。短于两倍时圆角吃掉大半，箭头就不成形了 -->
+    <path d="M593 321H703V431"/>
+  </g>
+
+  <circle cx="343" cy="681" r="54" fill="#FFFFFF"/>
+
+  <!-- 视觉中点略偏右上：箭头那端多了两翼的分量，摆在数学中点上会显得往左下坠。
+       遮罩圆要比白环大出十几像素——只留几像素的话，读起来不像「线穿过节点」，
+       倒像描边没对齐的渲染瑕疵。 -->
+  <circle cx="535" cy="489" r="76" fill="url(#pk-bg)"/>
+  <circle cx="535" cy="489" r="46" stroke="#FFFFFF" stroke-width="24" fill="none"/>
+</svg>

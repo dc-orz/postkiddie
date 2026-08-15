@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import {
+  environment as environmentIpc,
   folder as folderIpc,
   IpcCallError,
   workspace as ipc,
@@ -33,6 +34,11 @@ interface WorkspaceState {
   /** 新建文件夹，返回其 id */
   createFolder: (parent: string | null, name: string) => Promise<string>;
   deleteRequest: (id: string) => Promise<void>;
+
+  saveEnvironment: (name: string, environment: Environment) => Promise<void>;
+  createEnvironment: (name: string) => Promise<Environment>;
+  deleteEnvironment: (name: string) => Promise<void>;
+
   setActiveEnvironment: (name: string | null) => void;
   forgetRecent: (path: string) => void;
   clearError: () => void;
@@ -124,6 +130,29 @@ export const useWorkspace = create<WorkspaceState>()(
         deleteRequest: async (id) => {
           await requestIpc.remove(id);
           await get().refresh();
+        },
+
+        saveEnvironment: async (name, environment) => {
+          await environmentIpc.save(name, environment);
+          await get().refresh();
+        },
+
+        createEnvironment: async (name) => {
+          const created = await environmentIpc.create(name);
+          await get().refresh();
+          // 刚建好就切过去，否则用户还得再去下拉框点一次
+          set({ activeEnvironment: created.name });
+          return created;
+        },
+
+        deleteEnvironment: async (name) => {
+          await environmentIpc.remove(name);
+          await get().refresh();
+
+          // 删掉的正是当前选中的，退回到剩下的第一个
+          if (get().activeEnvironment === name) {
+            set({ activeEnvironment: get().environments[0]?.name ?? null });
+          }
         },
 
         setActiveEnvironment: (activeEnvironment) => set({ activeEnvironment }),

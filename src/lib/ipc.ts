@@ -101,6 +101,21 @@ export const folder = {
 };
 
 // ---------------------------------------------------------------------------
+// 环境
+// ---------------------------------------------------------------------------
+
+export const environment = {
+  /**
+   * 保存环境。传入的对象里可以带 secret 变量的真实值——
+   * Rust 侧会把它们抽到本机密钥库，不会写进 git 跟踪的文件。
+   */
+  save: (name: string, env: Environment) =>
+    call<void>("environment_save", { name, environment: env }),
+  create: (name: string) => call<Environment>("environment_create", { name }),
+  remove: (name: string) => call<void>("environment_delete", { name }),
+};
+
+// ---------------------------------------------------------------------------
 // Git
 // ---------------------------------------------------------------------------
 

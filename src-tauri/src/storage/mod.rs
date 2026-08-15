@@ -53,6 +53,30 @@ pub struct SecretStore {
         std::collections::BTreeMap<String, std::collections::BTreeMap<String, String>>,
 }
 
+/// 把环境拆成「可入库的公开部分」与「仅存本机的密钥」。
+///
+/// 抽成纯函数而不是留在命令层：这是整个应用唯一一条可能把密钥写进 git 的路径，
+/// 值得能被直接单测覆盖，而不必先拉起 Tauri 运行时。
+///
+/// 返回的 `Environment` 中，`secret` 变量的 `value` 一律为空——即便调用方传了值进来。
+pub fn split_secrets(
+    environment: Environment,
+) -> (Environment, std::collections::BTreeMap<String, String>) {
+    let mut public = environment;
+    let mut secrets = std::collections::BTreeMap::new();
+
+    for var in &mut public.variables {
+        if var.secret {
+            let value = std::mem::take(&mut var.value);
+            if !value.is_empty() {
+                secrets.insert(var.name.clone(), value);
+            }
+        }
+    }
+
+    (public, secrets)
+}
+
 impl Workspace {
     /// 打开已有工作区。目录必须已是 git 仓库——「git 管理」是这个应用的前提而非可选项。
     pub fn open(root: &Path) -> Result<Self> {
@@ -115,6 +139,81 @@ impl Workspace {
             return Ok(Vec::new());
         }
         tree::scan(&self.root, &collections)
+    }
+
+    /// 环境列表，且把本机密钥值合并回 `secret` 变量。
+    ///
+    /// UI 需要看到并编辑真实的密钥值，所以给它的必须是合并后的完整对象；
+    /// 写回时由 `commands::environment::environment_save` 重新分离。
+    pub fn list_environments_resolved(&self) -> Result<Vec<Environment>> {
+        let secrets = self.read_secrets()?;
+        let mut envs = self.list_environments()?;
+
+        for env in &mut envs {
+            let Some(bucket) = secrets.environments.get(&env.name) else {
+                continue;
+            };
+            for var in &mut env.variables {
+                if var.secret
+                    && let Some(value) = bucket.get(&var.name)
+                {
+                    var.value = value.clone();
+                }
+            }
+        }
+        Ok(envs)
+    }
+
+    /// 环境文件路径。文件名经过净化，环境名可以是任意文本。
+    pub fn environment_path(&self, name: &str) -> PathBuf {
+        self.environments_path()
+            .join(format!("{}.yaml", paths::sanitize_file_name(name)))
+    }
+
+    /// 原样写入环境文件。**不做密钥分离**，一般不要直接用——
+    /// 除非你确信传入的对象里已经没有密钥值。日常保存请走 [`Self::save_environment`]。
+    pub fn write_environment_raw(&self, name: &str, environment: &Environment) -> Result<()> {
+        std::fs::create_dir_all(self.environments_path())?;
+        let yaml = serde_norway::to_string(environment)?;
+        std::fs::write(self.environment_path(name), yaml)?;
+        Ok(())
+    }
+
+    /// 保存环境：密钥值抽到本机密钥库，公开部分写进 git 跟踪的文件。
+    ///
+    /// 这是保存环境的**唯一**入口，命令层和测试都走这条路径——
+    /// 若让两者各写一份分离逻辑，迟早会漂移，而漂移的后果是密钥进了 git。
+    pub fn save_environment(&self, name: &str, environment: Environment) -> Result<()> {
+        let (public, bucket) = split_secrets(environment);
+
+        let mut secrets = self.read_secrets()?;
+        if bucket.is_empty() {
+            // 不留空条目，否则 secrets.yaml 会随环境增删越积越乱
+            secrets.environments.remove(name);
+        } else {
+            secrets.environments.insert(name.to_owned(), bucket);
+        }
+
+        self.write_environment_raw(name, &public)?;
+        self.write_secrets(&secrets)?;
+        Ok(())
+    }
+
+    /// 删除环境，同时清掉它在本机密钥库里的那一组值。
+    ///
+    /// 一并清理是刻意的：留着一组指向已删除环境的密钥没有任何用处，
+    /// 只会让 secrets.yaml 越积越多，且日后同名环境重建时会静默继承旧值。
+    pub fn delete_environment(&self, name: &str) -> Result<()> {
+        let path = self.environment_path(name);
+        if path.exists() {
+            std::fs::remove_file(&path)?;
+        }
+
+        let mut secrets = self.read_secrets()?;
+        if secrets.environments.remove(name).is_some() {
+            self.write_secrets(&secrets)?;
+        }
+        Ok(())
     }
 
     pub fn list_environments(&self) -> Result<Vec<Environment>> {

@@ -83,6 +83,7 @@ export function Workbench() {
       <TitleBar />
 
       <div className="flex min-h-0 flex-1">
+        {/* 侧栏内部的上下分割（集合树 / Git 面板）由 Sidebar 自己管理 */}
         <aside
           style={{ width: sidebarWidth }}
           className="flex shrink-0 flex-col border-r border-line-subtle bg-surface"

@@ -1,5 +1,7 @@
-import { ChevronDown, Layers, Monitor, Moon, Sun } from "lucide-react";
+import { ChevronDown, Layers, Monitor, Moon, Settings2, Sun } from "lucide-react";
+import { useState } from "react";
 
+import { EnvironmentDialog } from "@/components/environment/EnvironmentDialog";
 import { cn } from "@/lib/cn";
 import { type ThemeMode, useTheme } from "@/stores/theme";
 import { useWorkspace } from "@/stores/workspace";
@@ -22,6 +24,8 @@ export function TitleBar() {
   const environments = useWorkspace((s) => s.environments);
   const activeEnvironment = useWorkspace((s) => s.activeEnvironment);
   const setActiveEnvironment = useWorkspace((s) => s.setActiveEnvironment);
+
+  const [envDialogOpen, setEnvDialogOpen] = useState(false);
 
   return (
     <header
@@ -71,6 +75,21 @@ export function TitleBar() {
           className="pointer-events-none absolute right-1.5 text-fg-muted"
         />
       </div>
+
+      <button
+        type="button"
+        title="管理环境与密钥"
+        aria-label="管理环境与密钥"
+        onClick={() => setEnvDialogOpen(true)}
+        className={cn(
+          "pk-no-drag flex size-control-sm items-center justify-center rounded-md border border-line",
+          "text-fg-muted transition-colors duration-fast hover:bg-hover hover:text-fg",
+        )}
+      >
+        <Settings2 size={12} strokeWidth={2} />
+      </button>
+
+      <EnvironmentDialog open={envDialogOpen} onClose={() => setEnvDialogOpen(false)} />
 
       <div className="pk-no-drag flex items-center rounded-md border border-line p-0.5">
         {MODES.map(({ mode: m, icon: Icon, label }) => (

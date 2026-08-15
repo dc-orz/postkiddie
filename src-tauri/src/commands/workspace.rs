@@ -93,5 +93,6 @@ pub async fn workspace_tree(state: State<'_, AppState>) -> Result<Vec<TreeNode>>
 
 #[tauri::command]
 pub async fn workspace_environments(state: State<'_, AppState>) -> Result<Vec<Environment>> {
-    state.workspace()?.list_environments()
+    // 返回合并了本机密钥的完整环境，UI 才能显示与编辑 secret 变量的真实值
+    state.workspace()?.list_environments_resolved()
 }

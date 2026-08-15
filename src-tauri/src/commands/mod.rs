@@ -6,6 +6,7 @@
 //!
 //! 命名约定：`<领域>_<动作>`，与前端 `src/lib/ipc.ts` 中的封装一一对应。
 
+pub mod environment;
 pub mod git;
 pub mod request;
 pub mod workspace;

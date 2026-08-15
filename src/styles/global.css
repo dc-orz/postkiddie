@@ -178,6 +178,15 @@
   }
 }
 
+@layer components {
+  /* 原生 <dialog> 的遮罩。用它而非自绘弹层：焦点陷阱、ESC 关闭、
+     inert 化背景内容都是浏览器免费给的，自己实现容易漏掉可访问性细节。 */
+  .pk-dialog::backdrop {
+    background-color: light-dark(oklch(0% 0 0 / 0.28), oklch(0% 0 0 / 0.55));
+    backdrop-filter: blur(2px);
+  }
+}
+
 @layer utilities {
   /* 自定义标题栏的拖拽区域（Tauri decorations: false 时使用） */
   .pk-drag-region {

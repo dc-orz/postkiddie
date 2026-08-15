@@ -12,7 +12,10 @@ use crate::{
     storage::{
         Workspace,
         paths::{resolve_within, sanitize_file_name, to_relative_slash},
-        tree::{REQUEST_EXT, read_folder_meta, read_request, write_folder_meta, write_request},
+        tree::{
+            REQUEST_EXT, current_order, read_folder_meta, read_request, write_folder_meta,
+            write_request,
+        },
     },
 };
 
@@ -141,6 +144,80 @@ fn rename_in_folder_order(dir: &Path, old_path: &Path, new_path: &Path) -> Resul
 
     *slot = new_name.to_owned();
     write_folder_meta(dir, &meta)
+}
+
+/// 移动请求到目标目录的指定位置，返回新的 id。
+///
+/// 一个命令同时完成「移动」与「插入到第几位」，因为拖拽在用户眼里就是一个动作；
+/// 拆成两次调用会出现中间态——文件已经过去了但顺序还没写，此时若失败就很难收拾。
+///
+/// `index` 为 None 表示追加到末尾。
+#[tauri::command]
+pub async fn request_move(
+    state: State<'_, AppState>,
+    id: String,
+    target_parent: Option<String>,
+    index: Option<usize>,
+) -> Result<String> {
+    let ws = state.workspace()?;
+    let old_path = resolve_within(&ws.root, &id)?;
+    let target_dir = resolve_parent(&ws, target_parent.as_deref())?;
+
+    let file_name = old_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| Error::Invalid("无法确定文件名".to_owned()))?
+        .to_owned();
+
+    let source_dir = old_path
+        .parent()
+        .ok_or_else(|| Error::Invalid("无法确定所在目录".to_owned()))?
+        .to_path_buf();
+
+    let same_dir = source_dir == target_dir;
+
+    // 跨目录时目标可能已有同名文件，消歧后再落地
+    let new_path = if same_dir {
+        old_path.clone()
+    } else {
+        std::fs::create_dir_all(&target_dir)?;
+        let stem = Path::new(&file_name)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("请求");
+        unique_path(&target_dir, stem, REQUEST_EXT)
+    };
+    let new_name = new_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(&file_name)
+        .to_owned();
+
+    if !same_dir {
+        move_file(state.git.as_ref(), &ws.root, &old_path, &new_path)?;
+
+        // 从源目录的顺序里摘掉它，否则会留下一个指向已移走文件的名字
+        let mut source_meta = read_folder_meta(&source_dir)?;
+        if source_meta.order.iter().any(|n| n == &file_name) {
+            source_meta.order.retain(|n| n != &file_name);
+            write_folder_meta(&source_dir, &source_meta)?;
+        }
+    }
+
+    // 物化目标目录的当前顺序后再插入。order 允许不完整，
+    // 若只把被拖动项写进去，其余条目的相对位置会跟着漂。
+    let mut order = current_order(&target_dir)?;
+    order.retain(|n| n != &new_name);
+    let at = index.unwrap_or(order.len()).min(order.len());
+    order.insert(at, new_name);
+
+    let mut target_meta = read_folder_meta(&target_dir)?;
+    target_meta.order = order;
+    write_folder_meta(&target_dir, &target_meta)?;
+
+    let new_id = to_relative_slash(&ws.root, &new_path)?;
+    tracing::info!(from = %id, to = %new_id, index = at, "已移动请求");
+    Ok(new_id)
 }
 
 /// 重排某个目录下的显示顺序。

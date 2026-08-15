@@ -35,6 +35,8 @@ interface WorkspaceState {
   createFolder: (parent: string | null, name: string) => Promise<string>;
   /** 重命名请求，返回新的 id（文件名会跟着变） */
   renameRequest: (id: string, name: string) => Promise<string>;
+  /** 移动请求到目标目录的指定位置，返回新的 id */
+  moveRequest: (id: string, targetParent: string | null, index: number | null) => Promise<string>;
   deleteRequest: (id: string) => Promise<void>;
 
   saveEnvironment: (name: string, environment: Environment) => Promise<void>;
@@ -131,6 +133,12 @@ export const useWorkspace = create<WorkspaceState>()(
 
         renameRequest: async (id, name) => {
           const newId = await requestIpc.rename(id, name);
+          await get().refresh();
+          return newId;
+        },
+
+        moveRequest: async (id, targetParent, index) => {
+          const newId = await requestIpc.move(id, targetParent, index);
           await get().refresh();
           return newId;
         },

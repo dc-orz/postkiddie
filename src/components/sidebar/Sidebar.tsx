@@ -2,10 +2,11 @@ import { FilePlus2, FolderPlus, Inbox, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 import { GitPanel } from "@/components/git/GitPanel";
-import { CollectionTree } from "@/components/sidebar/CollectionTree";
+import { CollectionTree, type DropPosition } from "@/components/sidebar/CollectionTree";
 import { Splitter } from "@/components/ui/Splitter";
 import { cn } from "@/lib/cn";
 import { showError } from "@/lib/dialog";
+import { isNoopMove, resolveDropTarget } from "@/lib/tree-move";
 import { useElementSize } from "@/lib/use-element-size";
 import { useGitFileStates } from "@/stores/git";
 import { GIT_PANEL_MIN, TREE_MIN, useLayout } from "@/stores/layout";
@@ -57,6 +58,7 @@ export function Sidebar() {
   const createRequest = useWorkspace((s) => s.createRequest);
   const createFolder = useWorkspace((s) => s.createFolder);
   const renameRequest = useWorkspace((s) => s.renameRequest);
+  const moveRequest = useWorkspace((s) => s.moveRequest);
 
   const selectedId = useRequest((s) => s.id);
   const select = useRequest((s) => s.select);
@@ -105,6 +107,20 @@ export function Sidebar() {
       if (selectedId === id) await select(newId);
     } catch (error) {
       await showError(error instanceof Error ? error.message : String(error), "重命名失败");
+    }
+  }
+
+  async function handleMove(sourceId: string, targetId: string, position: DropPosition) {
+    const target = resolveDropTarget(tree, sourceId, targetId, position);
+    // 原地放下就什么都别做，免得平白产生一次 _folder.yaml 的改动
+    if (!target || isNoopMove(tree, sourceId, target)) return;
+
+    try {
+      const newId = await moveRequest(sourceId, target.parent, target.index);
+      // 跨目录后 id 变了，当前打开的那个要跟着切过去
+      if (selectedId === sourceId) await select(newId);
+    } catch (error) {
+      await showError(error instanceof Error ? error.message : String(error), "移动失败");
     }
   }
 
@@ -160,6 +176,7 @@ export function Sidebar() {
               onRenameStart={setRenamingId}
               onRenameCommit={(id, name) => void handleRename(id, name)}
               onRenameCancel={() => setRenamingId(null)}
+              onMove={(source, target, position) => void handleMove(source, target, position)}
             />
           )}
         </nav>

@@ -330,3 +330,79 @@ fn secrets_are_stored_outside_git_tracked_files() {
     // 集合目录里不得出现密钥
     assert!(!ws.collections_path().join("secrets.yaml").exists());
 }
+
+/// `current_order` 必须与 `scan` 看到的顺序完全一致。
+///
+/// 拖拽插入时要先用它物化当前顺序再整体写回；两者一旦分叉，
+/// 拖完的结果就会与用户眼前看到的排列对不上。
+#[test]
+fn current_order_matches_what_scan_shows() {
+    let (_dir, ws) = temp_workspace();
+
+    for name in ["zebra", "Apple", "mango"] {
+        write_yaml(
+            &ws,
+            &format!("collections/{name}.yaml"),
+            &format!("name: {name}\nurl: /x\n"),
+        );
+    }
+    fs::create_dir_all(ws.collections_path().join("子目录")).unwrap();
+
+    // order 只列出其中一个，其余走兜底排序
+    let meta = FolderMeta {
+        order: vec!["mango.yaml".to_owned()],
+        ..Default::default()
+    };
+    fs::write(
+        ws.collections_path().join("_folder.yaml"),
+        serde_norway::to_string(&meta).unwrap(),
+    )
+    .unwrap();
+
+    let from_scan: Vec<String> = ws
+        .scan()
+        .unwrap()
+        .iter()
+        .map(|n| match n {
+            TreeNode::Folder { name, .. } => name.clone(),
+            TreeNode::Request { name, .. } => format!("{name}.yaml"),
+            TreeNode::Broken { name, .. } => name.clone(),
+        })
+        .collect();
+
+    let from_order = postkiddie_lib::storage::tree::current_order(&ws.collections_path()).unwrap();
+
+    // scan 给的是显示名，current_order 给的是文件名；此处刻意让二者可比
+    assert_eq!(from_order.len(), from_scan.len());
+    assert_eq!(from_order[0], "mango.yaml", "order 里列出的应当排在最前");
+    assert_eq!(from_order, from_scan, "两套顺序必须一致");
+}
+
+/// order 不完整时也要返回**全部**条目——这正是「物化」的意义
+#[test]
+fn current_order_materializes_all_entries() {
+    let (_dir, ws) = temp_workspace();
+    for name in ["a", "b", "c"] {
+        write_yaml(
+            &ws,
+            &format!("collections/{name}.yaml"),
+            &format!("name: {name}\nurl: /x\n"),
+        );
+    }
+
+    // 完全没有 _folder.yaml
+    let order = postkiddie_lib::storage::tree::current_order(&ws.collections_path()).unwrap();
+    assert_eq!(order, vec!["a.yaml", "b.yaml", "c.yaml"]);
+}
+
+#[test]
+fn current_order_ignores_meta_file_and_hidden_entries() {
+    let (_dir, ws) = temp_workspace();
+    write_yaml(&ws, "collections/真请求.yaml", "name: 真请求\nurl: /x\n");
+    write_yaml(&ws, "collections/README.md", "# 说明\n");
+    write_yaml(&ws, "collections/.DS_Store", "");
+    fs::write(ws.collections_path().join("_folder.yaml"), "order: []\n").unwrap();
+
+    let order = postkiddie_lib::storage::tree::current_order(&ws.collections_path()).unwrap();
+    assert_eq!(order, vec!["真请求.yaml"]);
+}

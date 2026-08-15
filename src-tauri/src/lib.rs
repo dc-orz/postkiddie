@@ -88,6 +88,7 @@ pub fn run() {
             commands::request::request_create,
             commands::request::request_delete,
             commands::request::request_rename,
+            commands::request::request_move,
             commands::request::folder_create,
             commands::request::folder_reorder,
             commands::request::request_send,

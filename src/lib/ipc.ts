@@ -85,6 +85,12 @@ export const request = {
     call<string>("request_create", { parent, name, method: method ?? null }),
   /** 同时改文件名与 YAML 里的 name，返回新的 id */
   rename: (id: string, name: string) => call<string>("request_rename", { id, name }),
+  /**
+   * 移动到目标目录的指定位置，返回新的 id。
+   * index 为 null 表示追加到末尾；targetParent 为 null 表示集合根。
+   */
+  move: (id: string, targetParent: string | null, index: number | null) =>
+    call<string>("request_move", { id, targetParent, index }),
   remove: (id: string) => call<void>("request_delete", { id }),
   send: (req: HttpRequest, environment?: string) =>
     call<HttpResponse>("request_send", {

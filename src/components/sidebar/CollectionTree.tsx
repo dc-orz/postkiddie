@@ -81,21 +81,98 @@ interface CollectionTreeProps {
   onRenameStart: (id: string) => void;
   onRenameCommit: (id: string, name: string) => void;
   onRenameCancel: () => void;
+  /** 把 sourceId 拖到 targetId 的 before / after / inside */
+  onMove: (sourceId: string, targetId: string, position: DropPosition) => void;
 }
 
-export function CollectionTree({ nodes, ...rest }: CollectionTreeProps) {
+/** 落点相对目标节点的位置。`inside` 只对文件夹有意义（移入其中）。 */
+export type DropPosition = "before" | "after" | "inside";
+
+interface DragState {
+  sourceId: string;
+  overId: string | null;
+  position: DropPosition | null;
+}
+
+/**
+ * 判断指针落在节点的哪一段。
+ *
+ * 请求只有上下两半；文件夹多一个「中间 = 移入」区，但上下各留 30% 给
+ * before/after，否则想把请求排到文件夹前面会异常难对准。
+ */
+function positionFromPointer(rect: DOMRect, clientY: number, isFolder: boolean): DropPosition {
+  const ratio = (clientY - rect.top) / rect.height;
+  if (!isFolder) return ratio < 0.5 ? "before" : "after";
+  if (ratio < 0.3) return "before";
+  if (ratio > 0.7) return "after";
+  return "inside";
+}
+
+export function CollectionTree({ nodes, onMove, ...rest }: CollectionTreeProps) {
+  /**
+   * 拖拽状态存两份，与 Splitter 是同一个理由：
+   * 事件处理器必须同步读到最新值。`setDrag` 要等下一次渲染才生效，
+   * 而 dragstart 之后同一帧内到达的 dragover / drop 会读到旧的 null，
+   * 整个拖拽就静默失效了。state 那份只用来驱动视觉反馈。
+   */
+  const dragRef = useRef<DragState | null>(null);
+  const [drag, setDrag] = useState<DragState | null>(null);
+
+  const update = (next: DragState | null) => {
+    dragRef.current = next;
+    setDrag(next);
+  };
+
+  const dnd: DndProps = {
+    drag,
+    dragRef,
+    onDragStart: (sourceId) => update({ sourceId, overId: null, position: null }),
+    onDragOver: (overId, position) => {
+      const current = dragRef.current;
+      if (!current) return;
+      update({ ...current, overId, position });
+    },
+    onDragEnd: () => update(null),
+    onDrop: (targetId, position) => {
+      const sourceId = dragRef.current?.sourceId;
+      update(null);
+      // 拖到自己身上是无操作，别去打扰磁盘
+      if (sourceId && sourceId !== targetId) onMove(sourceId, targetId, position);
+    },
+  };
+
   return (
-    <ul className="py-1">
+    <ul className="py-1" onDragEnd={() => setDrag(null)}>
       {nodes.map((node) => (
-        <TreeItem key={node.id} node={node} depth={0} {...rest} />
+        <TreeItem key={node.id} node={node} depth={0} dnd={dnd} {...rest} />
       ))}
     </ul>
   );
 }
 
-interface TreeItemProps extends Omit<CollectionTreeProps, "nodes"> {
+interface DndProps {
+  /** 仅用于渲染拖拽反馈 */
+  drag: DragState | null;
+  /** 事件处理器读这一份：它同步更新，不受渲染时机影响 */
+  dragRef: React.RefObject<DragState | null>;
+  onDragStart: (sourceId: string) => void;
+  onDragOver: (overId: string, position: DropPosition) => void;
+  onDragEnd: () => void;
+  onDrop: (targetId: string, position: DropPosition) => void;
+}
+
+/** 拖拽反馈的边框样式。用 1px 线而非整块高亮，与侧栏一贯的克制保持一致。 */
+function dropIndicator(drag: DragState | null, nodeId: string): string | false {
+  if (drag?.overId !== nodeId || !drag.position) return false;
+  if (drag.position === "before") return "border-t-2 border-t-accent";
+  if (drag.position === "after") return "border-b-2 border-b-accent";
+  return "bg-accent-soft ring-1 ring-inset ring-accent";
+}
+
+interface TreeItemProps extends Omit<CollectionTreeProps, "nodes" | "onMove"> {
   node: TreeNode;
   depth: number;
+  dnd: DndProps;
 }
 
 function TreeItem({ node, depth, ...rest }: TreeItemProps) {
@@ -108,7 +185,42 @@ function TreeItem({ node, depth, ...rest }: TreeItemProps) {
     onRenameStart,
     onRenameCommit,
     onRenameCancel,
+    dnd,
   } = rest;
+
+  const isFolder = node.kind === "folder";
+  /** 挂在每个可拖拽行上的一组事件 */
+  const dragHandlers = {
+    // 一期只允许拖请求：移动整个目录还要处理两边 order 的合并，语义更重，先不放开
+    draggable: node.kind === "request",
+    onDragStart: (e: React.DragEvent) => {
+      e.stopPropagation();
+      e.dataTransfer.effectAllowed = "move";
+      // 必须写点什么，否则 Firefox 不启动拖拽
+      e.dataTransfer.setData("text/plain", node.id);
+      dnd.onDragStart(node.id);
+    },
+    onDragOver: (e: React.DragEvent) => {
+      const current = dnd.dragRef.current;
+      if (!current || current.sourceId === node.id) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = "move";
+      const rect = e.currentTarget.getBoundingClientRect();
+      dnd.onDragOver(node.id, positionFromPointer(rect, e.clientY, isFolder));
+    },
+    onDrop: (e: React.DragEvent) => {
+      if (!dnd.dragRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const rect = e.currentTarget.getBoundingClientRect();
+      dnd.onDrop(node.id, positionFromPointer(rect, e.clientY, isFolder));
+    },
+    onDragEnd: dnd.onDragEnd,
+  };
+
+  const indicator = dropIndicator(dnd.drag, node.id);
+  const draggedAway = dnd.drag?.sourceId === node.id;
   const [expanded, setExpanded] = useState(depth === 0);
 
   // 缩进用 padding 而非嵌套 margin，这样整行的 hover 高亮能铺满侧栏宽度
@@ -121,6 +233,9 @@ function TreeItem({ node, depth, ...rest }: TreeItemProps) {
     "flex h-row w-full items-center gap-1.5 pr-2 text-left",
     "transition-colors duration-[120ms]",
     selected ? "bg-selected text-fg" : "text-fg-secondary hover:bg-hover",
+    // 被拖起的那一项淡出，让人看清自己正在搬哪个
+    draggedAway && "opacity-40",
+    indicator,
   );
 
   if (node.kind === "folder") {
@@ -135,6 +250,7 @@ function TreeItem({ node, depth, ...rest }: TreeItemProps) {
           style={indent}
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
+          {...dragHandlers}
         >
           <Chevron size={12} strokeWidth={2} className="text-fg-subtle" />
           <FolderIcon size={13} strokeWidth={1.75} className="text-fg-muted" />
@@ -191,7 +307,8 @@ function TreeItem({ node, depth, ...rest }: TreeItemProps) {
         style={indent}
         onClick={() => onSelect(node.id)}
         onDoubleClick={() => onRenameStart(node.id)}
-        title="双击重命名"
+        title="双击重命名，拖拽可排序或移入文件夹"
+        {...dragHandlers}
       >
         <MethodBadge method={node.method} />
         <span className="pk-truncate flex-1 text-sm">{node.name}</span>

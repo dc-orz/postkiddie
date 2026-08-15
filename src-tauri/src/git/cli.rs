@@ -36,6 +36,15 @@ impl GitCli {
         static GIT_BIN: OnceLock<PathBuf> = OnceLock::new();
 
         GIT_BIN.get_or_init(|| {
+            // PATH 找不到时的兜底位置，按平台区分——
+            // 在 Windows 上罗列 /usr/bin/git 毫无意义，等于没有兜底
+            #[cfg(target_os = "windows")]
+            const CANDIDATES: &[&str] = &[
+                r"C:\Program Files\Git\cmd\git.exe",
+                r"C:\Program Files (x86)\Git\cmd\git.exe",
+                r"C:\Program Files\Git\bin\git.exe",
+            ];
+            #[cfg(not(target_os = "windows"))]
             const CANDIDATES: &[&str] = &[
                 "/usr/bin/git",
                 "/opt/homebrew/bin/git",

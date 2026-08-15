@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { KeyValueTable } from "@/components/ui/KeyValueTable";
 import { cn } from "@/lib/cn";
 import { showError } from "@/lib/dialog";
+import { shortcut } from "@/lib/platform";
 import { useIsDirty, useRequest } from "@/stores/request";
 import { HTTP_METHODS, type HttpMethod, type HttpRequest, type KeyValue } from "@/types/api";
 
@@ -94,7 +95,7 @@ export function RequestPane() {
           variant="ghost"
           onClick={() => void handleSave()}
           disabled={!dirty || saving}
-          title="保存 (⌘S)"
+          title={`保存 (${shortcut("S")})`}
         >
           {saving ? (
             <Loader2 size={12} strokeWidth={2} className="animate-spin" />
@@ -144,7 +145,7 @@ export function RequestPane() {
           size="lg"
           onClick={() => void send()}
           disabled={sending}
-          title="发送 (⌘↩)"
+          title={`发送 (${shortcut("↩")})`}
         >
           {sending ? (
             <Loader2 size={12} strokeWidth={2} className="animate-spin" />

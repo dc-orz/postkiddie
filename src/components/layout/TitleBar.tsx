@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { EnvironmentDialog } from "@/components/environment/EnvironmentDialog";
 import { cn } from "@/lib/cn";
+import { isMacOS } from "@/lib/platform";
 import { type ThemeMode, useTheme } from "@/stores/theme";
 import { useWorkspace } from "@/stores/workspace";
 
@@ -15,8 +16,9 @@ const MODES: { mode: ThemeMode; icon: typeof Sun; label: string }[] = [
 /**
  * 自定义标题栏。
  *
- * macOS 下窗口配置为 `titleBarStyle: "Overlay"`，原生红绿灯按钮悬浮在内容之上，
- * 因此左侧留出 `pl-20` 的空位避让；其余区域标记为可拖拽窗口。
+ * 左边距按平台区分：macOS 用 `titleBarStyle: "Overlay"`，原生红绿灯悬浮在内容之上，
+ * 必须留出约 80px 让位；Windows/Linux 的窗口按钮在右侧且保留原生标题栏，
+ * 同样留白只会让内容平白偏移一大块。
  */
 export function TitleBar() {
   const { mode, setMode } = useTheme();
@@ -31,7 +33,8 @@ export function TitleBar() {
     <header
       className={cn(
         "pk-drag-region flex h-titlebar shrink-0 items-center gap-3",
-        "border-b border-line-subtle bg-surface pr-2 pl-20",
+        "border-b border-line-subtle bg-surface pr-2",
+        isMacOS ? "pl-20" : "pl-3",
       )}
     >
       <span className="pk-truncate text-sm font-semibold tracking-tight">

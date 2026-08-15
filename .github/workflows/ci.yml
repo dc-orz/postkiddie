@@ -75,3 +75,65 @@ jobs:
 
       - name: 单元测试
         run: cargo test --manifest-path src-tauri/Cargo.toml --all-features
+
+  # 这是个跨端应用，但只在一个平台上跑检查等于没验证跨端。
+  # 这个 job 专门盯三类只会在特定平台暴露的问题：
+  #   - 路径分隔符（Windows 的 `\` vs 我们统一用的 `/`）
+  #   - git CLI 在各平台的输出差异与可执行文件定位
+  #   - Tauri 自身的平台条件编译
+  # fail-fast: false —— 一次看全所有平台的问题，而不是修一个再发现下一个。
+  cross-platform:
+    name: 跨平台编译与测试
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: 安装系统依赖
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.os }}
+
+      - run: pnpm install --frozen-lockfile
+
+      # tauri::generate_context! 会在编译期校验 frontendDist 存在，
+      # 所以必须先产出 dist，否则 cargo check 直接失败
+      - name: 构建前端产物
+        run: pnpm run build
+
+      - name: 编译检查
+        run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets
+
+      # 在各平台真跑一遍：路径处理与 git 集成的问题只有这样才看得见
+      - name: 单元与集成测试
+        run: cargo test --manifest-path src-tauri/Cargo.toml --all-features
+        env:
+          # git 集成测试要建提交，CI 的 runner 没有全局身份配置
+          GIT_AUTHOR_NAME: PostKiddie CI
+          GIT_AUTHOR_EMAIL: ci@postkiddie.dev
+          GIT_COMMITTER_NAME: PostKiddie CI
+          GIT_COMMITTER_EMAIL: ci@postkiddie.dev

@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 
 import { cn } from "@/lib/cn";
 import { confirmAction, showError } from "@/lib/dialog";
+import { shortcut } from "@/lib/platform";
 import { useGit } from "@/stores/git";
 import { useLayout } from "@/stores/layout";
 import type { FileState, StatusEntry } from "@/types/api";
@@ -169,7 +170,7 @@ export function GitPanel() {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={(e) => {
-            // ⌘↩ 提交，与 IDE 的习惯一致
+            // Cmd/Ctrl+Enter 提交，与 IDE 的习惯一致
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
               e.preventDefault();
               void handleCommit();
@@ -189,7 +190,7 @@ export function GitPanel() {
           type="button"
           onClick={() => void handleCommit()}
           disabled={!canCommit}
-          title="提交 (⌘↩)"
+          title={`提交 (${shortcut("↩")})`}
           className={cn(
             "mt-1.5 flex h-control-md w-full items-center justify-center gap-1.5 rounded-md",
             "bg-accent text-xs font-medium text-fg-on-accent transition-colors duration-fast",

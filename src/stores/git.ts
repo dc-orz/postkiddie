@@ -3,7 +3,8 @@ import { create } from "zustand";
 
 import { IpcCallError, git as ipc } from "@/lib/ipc";
 import type { FileState, GitStatus } from "@/types/api";
-import { useWorkspace } from "./workspace";
+import { useRequest } from "./request";
+import { flattenRequests, useWorkspace } from "./workspace";
 
 interface GitState {
   status: GitStatus | null;
@@ -17,6 +18,8 @@ interface GitState {
   unstage: (paths: string[]) => Promise<void>;
   discard: (paths: string[]) => Promise<void>;
   commit: (message: string) => Promise<void>;
+  /** 切换分支。`create` 为 true 时从当前 HEAD 新建。 */
+  checkout: (branch: string, create?: boolean) => Promise<void>;
   pull: () => Promise<void>;
   push: () => Promise<void>;
   fetch: () => Promise<void>;
@@ -67,6 +70,22 @@ export const useGit = create<GitState>()((set, get) => {
     unstage: (paths) => mutate(() => ipc.unstage(paths)),
     discard: (paths) => mutate(() => ipc.discard(paths), true),
     commit: (message) => mutate(async () => void (await ipc.commit(message))),
+
+    checkout: (branch, create = false) =>
+      mutate(async () => {
+        await ipc.checkout(branch, create);
+        // 重扫要在下面的判断之前发生，所以这里直接调，不走 mutate 的 rescanTree
+        await useWorkspace.getState().refresh();
+
+        // 分支之间的文件集合是不同的：当前打开的请求很可能在新分支上根本不存在。
+        // 不关掉的话，编辑区会挂着一个指向已消失文件的草稿，一按保存就把它
+        // **重新创建**到新分支上——用户并没有想在这里加这个接口。
+        const { id, close } = useRequest.getState();
+        if (id && !flattenRequests(useWorkspace.getState().tree).some((n) => n.id === id)) {
+          close();
+        }
+      }),
+
     pull: () => mutate(() => ipc.pull(true), true),
     push: () => mutate(() => ipc.push(false)),
     fetch: () => mutate(() => ipc.fetch()),

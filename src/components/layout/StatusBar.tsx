@@ -1,12 +1,6 @@
-import {
-  ArrowDown,
-  ArrowUp,
-  GitBranch,
-  Loader2,
-  SquareTerminal,
-  TriangleAlert,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, SquareTerminal, TriangleAlert } from "lucide-react";
 
+import { BranchSwitcher } from "@/components/git/BranchSwitcher";
 import { cn } from "@/lib/cn";
 import { shortcut } from "@/lib/platform";
 import { useDirtyCount, useGit } from "@/stores/git";
@@ -20,7 +14,6 @@ import { useLayout } from "@/stores/layout";
  */
 export function StatusBar() {
   const status = useGit((s) => s.status);
-  const busy = useGit((s) => s.busy);
   const dirtyCount = useDirtyCount();
   const toggleGitPanel = useLayout((s) => s.toggleGitPanel);
   const gitPanelOpen = useLayout((s) => s.gitPanelOpen);
@@ -34,25 +27,7 @@ export function StatusBar() {
         "border-t border-line-subtle bg-surface text-xs text-fg-muted",
       )}
     >
-      <button
-        type="button"
-        onClick={toggleGitPanel}
-        aria-pressed={gitPanelOpen}
-        title="打开 Git 面板"
-        className={cn(
-          "flex items-center gap-1 rounded-sm px-1 hover:bg-hover hover:text-fg",
-          gitPanelOpen && "bg-accent-soft text-accent-fg",
-        )}
-      >
-        {busy ? (
-          <Loader2 size={11} strokeWidth={2} className="animate-spin" />
-        ) : (
-          <GitBranch size={11} strokeWidth={2} />
-        )}
-        <span className="font-medium text-fg-secondary">
-          {status?.branch ?? (status ? "分离 HEAD" : "—")}
-        </span>
-      </button>
+      <BranchSwitcher />
 
       {status?.upstream ? (
         <span className="pk-tnum flex items-center gap-1.5 font-mono">
@@ -78,12 +53,27 @@ export function StatusBar() {
         </span>
       ) : null}
 
-      {dirtyCount > 0 ? (
-        <span className="pk-tnum">
-          <span className="text-git-modified">{dirtyCount}</span> 项未提交
-        </span>
-      ) : status ? (
-        <span className="text-fg-subtle">工作区干净</span>
+      {/* Git 面板的开关。挂在改动数上而不是分支名上——点「3 项未提交」看那 3 项，
+          这条对应关系不需要解释；分支名让给了切换分支（见 BranchSwitcher）。 */}
+      {status ? (
+        <button
+          type="button"
+          onClick={toggleGitPanel}
+          aria-pressed={gitPanelOpen}
+          title="源代码管理"
+          className={cn(
+            "rounded-sm px-1 hover:bg-hover hover:text-fg",
+            gitPanelOpen && "bg-accent-soft text-accent-fg",
+          )}
+        >
+          {dirtyCount > 0 ? (
+            <span className="pk-tnum">
+              <span className="text-git-modified">{dirtyCount}</span> 项未提交
+            </span>
+          ) : (
+            <span className="text-fg-subtle">工作区干净</span>
+          )}
+        </button>
       ) : null}
 
       <button

@@ -123,6 +123,14 @@ export const commands = {
 	gitPush: (setUpstream: boolean) => typedError<null, IpcError>(__TAURI_INVOKE("git_push", { setUpstream })),
 	/**  读取某个历史版本下的文件内容，用于「与历史版本对比」。 */
 	gitShowFile: (rev: string, path: string) => typedError<string, IpcError>(__TAURI_INVOKE("git_show_file", { rev, path })),
+	/**
+	 *  把 base64 内容写入指定路径。
+	 * 
+	 *  不校验路径是否在工作区内，这点与其他命令不同：另存为的目标本来就是
+	 *  工作区之外（下载目录、桌面……），而路径又只可能来自系统保存对话框，
+	 *  用户已经在那里亲自选定了位置。
+	 */
+	fileSaveBase64: (path: string, base64: string) => typedError<null, IpcError>(__TAURI_INVOKE("file_save_base64", { path, base64 })),
 };
 
 /* Types */

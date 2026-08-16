@@ -1,4 +1,4 @@
-import { confirm, message, open } from "@tauri-apps/plugin-dialog";
+import { confirm, message, open, save } from "@tauri-apps/plugin-dialog";
 
 /**
  * 系统原生对话框。
@@ -11,6 +11,11 @@ import { confirm, message, open } from "@tauri-apps/plugin-dialog";
 export async function pickDirectory(title: string): Promise<string | null> {
   const selected = await open({ directory: true, multiple: false, title });
   return typeof selected === "string" ? selected : null;
+}
+
+/** 打开保存对话框，返回用户选定的路径；取消时返回 null。 */
+export async function pickSavePath(defaultName: string): Promise<string | null> {
+  return save({ defaultPath: defaultName });
 }
 
 /** 破坏性或有副作用的操作前的确认框 */

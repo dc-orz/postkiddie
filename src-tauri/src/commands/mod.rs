@@ -8,6 +8,7 @@
 
 pub mod cookie;
 pub mod environment;
+pub mod file;
 pub mod git;
 pub mod request;
 pub mod workspace;

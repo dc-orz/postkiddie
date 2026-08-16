@@ -1,9 +1,22 @@
-import { Check, Copy, Inbox, Loader2, TriangleAlert, WrapText } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Download,
+  FileQuestion,
+  Inbox,
+  Loader2,
+  TriangleAlert,
+  WrapText,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { Button } from "@/components/ui/Button";
 import { CodeEditor, type CodeLanguage } from "@/components/ui/CodeEditor";
 import { Metric, StatusBadge } from "@/components/ui/StatusBadge";
 import { cn } from "@/lib/cn";
+import { pickSavePath, showError } from "@/lib/dialog";
+import { isImage, isPdf, mimeOf, suggestFileName } from "@/lib/filename";
+import { file as ipcFile } from "@/lib/ipc";
 import { formatJsonWithVariables } from "@/lib/json-format";
 import { useRequest } from "@/stores/request";
 import type { HttpResponse, KeyValue } from "@/types/api";
@@ -179,12 +192,12 @@ function BodyView({ response }: { response: HttpResponse }) {
 
   if (response.body.kind === "binary") {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-1 bg-sunken">
-        <p className="text-sm text-fg-muted">
-          二进制内容（{contentType ?? "未知类型"}，{formatSize(response.sizeBytes)}）
-        </p>
-        <p className="text-xs text-fg-subtle">预览与另存为待接入</p>
-      </div>
+      <BinaryBody
+        base64={response.body.base64}
+        contentType={contentType}
+        sizeBytes={response.sizeBytes}
+        finalUrl={response.finalUrl}
+      />
     );
   }
 
@@ -238,6 +251,85 @@ function BodyView({ response }: { response: HttpResponse }) {
       <div className="min-h-0 flex-1">
         {/* 只读的 CodeEditor 而非 <pre>：白得了语法高亮、搜索、折叠与大文档的虚拟滚动 */}
         <CodeEditor value={shown} language={language} readOnly ariaLabel="响应体" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 二进制响应体。
+ *
+ * 能预览的就地预览，不能的老实说明并给出另存为——这类响应在调 API 时
+ * 多半是验证码、导出的报表、下载接口，看一眼或存下来是仅有的两种诉求。
+ */
+function BinaryBody({
+  base64,
+  contentType,
+  sizeBytes,
+  finalUrl,
+}: {
+  base64: string;
+  contentType: string | undefined;
+  sizeBytes: number;
+  finalUrl: string;
+}) {
+  const [saving, setSaving] = useState(false);
+
+  // data: URL 而非 blob:：内容已经是 base64 了，转 blob 要多一次解码与对象生命周期管理，
+  // 而这里的体积上限受制于响应本身，不值得为省这点内存引入 revokeObjectURL 的时序问题
+  const dataUrl = `data:${mimeOf(contentType) || "application/octet-stream"};base64,${base64}`;
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const path = await pickSavePath(suggestFileName(finalUrl, contentType));
+      if (!path) return; // 用户取消
+      await ipcFile.saveBase64(path, base64);
+    } catch (error) {
+      await showError(error instanceof Error ? error.message : String(error), "另存为失败");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-sunken">
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+        {isImage(contentType) ? (
+          /* 内容来自运行时响应，不是构建期资源，谈不上图片优化 */
+          <img
+            src={dataUrl}
+            alt="响应图片"
+            className="max-h-full max-w-full object-contain"
+            // 棋盘底衬出透明区域，否则透明 PNG 在深色背景上会看不出边界
+            style={{
+              backgroundImage:
+                "repeating-conic-gradient(var(--pk-bg-inset) 0% 25%, transparent 0% 50%)",
+              backgroundSize: "16px 16px",
+            }}
+          />
+        ) : isPdf(contentType) ? (
+          <embed src={dataUrl} type="application/pdf" className="h-full w-full" />
+        ) : (
+          <div className="flex flex-col items-center gap-1">
+            <FileQuestion size={22} strokeWidth={1.5} className="text-fg-subtle" />
+            <p className="text-sm text-fg-muted">这个类型无法预览</p>
+          </div>
+        )}
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2 border-t border-line-subtle px-3 py-2">
+        <span className="pk-truncate flex-1 text-xs text-fg-muted">
+          {contentType ?? "未知类型"} · {formatSize(sizeBytes)}
+        </span>
+        <Button size="sm" onClick={() => void handleSave()} disabled={saving}>
+          {saving ? (
+            <Loader2 size={11} strokeWidth={2} className="animate-spin" />
+          ) : (
+            <Download size={11} strokeWidth={2} />
+          )}
+          另存为
+        </Button>
       </div>
     </div>
   );

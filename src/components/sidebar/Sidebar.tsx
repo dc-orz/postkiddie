@@ -1,11 +1,12 @@
-import { FilePlus2, FolderPlus, Inbox, RefreshCw } from "lucide-react";
+import { Download, FilePlus2, FolderPlus, Inbox, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 import { GitPanel } from "@/components/git/GitPanel";
 import { CollectionTree, type DropPosition } from "@/components/sidebar/CollectionTree";
 import { Splitter } from "@/components/ui/Splitter";
 import { cn } from "@/lib/cn";
-import { showError } from "@/lib/dialog";
+import { pickFile, showError, showMessage } from "@/lib/dialog";
+import { postman as ipcPostman } from "@/lib/ipc";
 import { isNoopMove, resolveDropTarget } from "@/lib/tree-move";
 import { useElementSize } from "@/lib/use-element-size";
 import { useGitFileStates } from "@/stores/git";
@@ -132,6 +133,23 @@ export function Sidebar() {
     }
   }
 
+  async function handleImportPostman() {
+    try {
+      const path = await pickFile("选择 Postman 集合", [
+        { name: "Postman Collection", extensions: ["json"] },
+      ]);
+      if (!path) return;
+
+      // 导入到集合根而非当前选中处：一份集合通常是独立的一批接口，
+      // 塞进别人的目录里反而要费劲挪出来
+      const count = await ipcPostman.import(path);
+      await refresh();
+      await showMessage(`已导入 ${count} 个请求。`, "导入完成");
+    } catch (error) {
+      await showError(error instanceof Error ? error.message : String(error), "导入失败");
+    }
+  }
+
   return (
     <div ref={containerRef} className="flex h-full min-h-0 flex-col">
       <div className="flex min-h-0 flex-1 flex-col">
@@ -143,6 +161,9 @@ export function Sidebar() {
           </ToolbarButton>
           <ToolbarButton label="新建文件夹" onClick={() => void handleCreateFolder()}>
             <FolderPlus size={13} strokeWidth={1.75} />
+          </ToolbarButton>
+          <ToolbarButton label="导入 Postman 集合" onClick={() => void handleImportPostman()}>
+            <Download size={13} strokeWidth={1.75} />
           </ToolbarButton>
           <ToolbarButton
             label="重新扫描"

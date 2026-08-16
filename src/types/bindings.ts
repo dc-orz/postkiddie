@@ -124,6 +124,14 @@ export const commands = {
 	/**  读取某个历史版本下的文件内容，用于「与历史版本对比」。 */
 	gitShowFile: (rev: string, path: string) => typedError<string, IpcError>(__TAURI_INVOKE("git_show_file", { rev, path })),
 	/**
+	 *  导入一份 Postman 集合，返回写入的请求数。
+	 * 
+	 *  集合整体落在一个以其名字命名的目录下，而不是摊到目标目录里：
+	 *  Postman 集合动辄几十条，摊开会把现有的树冲散，而套一层之后
+	 *  用户可以整体拖走、整体删掉，也一眼看得出这批是从哪来的。
+	 */
+	postmanImport: (path: string, parent: string | null) => typedError<number, IpcError>(__TAURI_INVOKE("postman_import", { path, parent })),
+	/**
 	 *  按时间倒序返回历史，最新的在前。
 	 * 
 	 *  排序放在后端：文件里是追加顺序（旧的在前），而 UI 想要的永远是最近的几条，

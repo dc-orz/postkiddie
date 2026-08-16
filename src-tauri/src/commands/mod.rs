@@ -11,5 +11,6 @@ pub mod environment;
 pub mod file;
 pub mod git;
 pub mod history;
+pub mod postman;
 pub mod request;
 pub mod workspace;

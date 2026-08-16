@@ -13,6 +13,15 @@ export async function pickDirectory(title: string): Promise<string | null> {
   return typeof selected === "string" ? selected : null;
 }
 
+/** 打开文件选择器，按扩展名过滤。用户取消时返回 null。 */
+export async function pickFile(
+  title: string,
+  filters: { name: string; extensions: string[] }[],
+): Promise<string | null> {
+  const selected = await open({ multiple: false, title, filters });
+  return typeof selected === "string" ? selected : null;
+}
+
 /** 打开保存对话框，返回用户选定的路径；取消时返回 null。 */
 export async function pickSavePath(defaultName: string): Promise<string | null> {
   return save({ defaultPath: defaultName });
@@ -29,6 +38,11 @@ export async function confirmAction(
     okLabel: options.okLabel ?? "继续",
     cancelLabel: "取消",
   });
+}
+
+/** 中性的完成提示。与 showError 分开是为了拿到系统对话框的正确图标与音效。 */
+export async function showMessage(text: string, title: string): Promise<void> {
+  await message(text, { title, kind: "info" });
 }
 
 export async function showError(text: string, title = "出错了"): Promise<void> {

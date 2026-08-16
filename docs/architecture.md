@@ -180,8 +180,16 @@ rc 之间有过破坏性改动。接受它是因为替代品更差——手写�
 
 **单工作区。** 多工作区通过多开窗口实现，这样每个窗口的 git 分支上下文彼此独立。
 
-**一期不做的**：gRPC/WebSocket、脚本与断言（pre-request / test）、
-Mock Server、Postman 集合导入。导入是最可能被优先补上的一项。
+**一期不做的**：gRPC/WebSocket、脚本与断言（pre-request / test）、Mock Server。
+
+**请求历史**落在 `.postkiddie/history.jsonl`，与 secrets / cookies 同处
+被 gitignore 的目录：历史带着实际发出的 URL 与响应内容，那是「我这台机器上
+发生过什么」，不是团队要共享的契约。响应体按 256KB 截断并标记，
+二进制不留内容，攒到 750 条压缩回 500。
+
+**Postman 导入**支持 Collection v2.x。查询串会从 URL 上摘下来放进 params——
+Postman 的 `raw` 里已经带着启用的 query，照搬又填 params 会让参数发两遍。
+认不出的方法与认证类型一律降级（GET / Inherit）而非丢弃整条请求。
 
 ## 5. 系统要求
 

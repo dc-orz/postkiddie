@@ -131,3 +131,14 @@ export const useRequest = create<RequestState>()((set, get) => ({
 export function useIsDirty(): boolean {
   return useRequest((s) => isDirty(s.draft, s.saved));
 }
+
+/**
+ * 同上，但不是 hook。
+ *
+ * 供组件之外的编排逻辑使用——比如切换工作区前要先问一句「改动还没保存，确定要走？」，
+ * 那段代码跑在事件处理里，用不了 hook。
+ */
+export function hasUnsavedChanges(): boolean {
+  const { draft, saved } = useRequest.getState();
+  return isDirty(draft, saved);
+}

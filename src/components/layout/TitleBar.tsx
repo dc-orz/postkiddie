@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CookieDialog } from "@/components/cookie/CookieDialog";
 import { EnvironmentDialog } from "@/components/environment/EnvironmentDialog";
 import { HistoryDialog } from "@/components/history/HistoryDialog";
+import { WorkspaceSwitcher } from "@/components/layout/WorkspaceSwitcher";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { cn } from "@/lib/cn";
 import { isMacOS } from "@/lib/platform";
@@ -20,7 +21,6 @@ import { useWorkspace } from "@/stores/workspace";
  * 后者收进设置弹框，标题栏才不至于被一排图标塞满。
  */
 export function TitleBar() {
-  const workspaceName = useWorkspace((s) => s.info?.name);
   const environments = useWorkspace((s) => s.environments);
   const activeEnvironment = useWorkspace((s) => s.activeEnvironment);
   const setActiveEnvironment = useWorkspace((s) => s.setActiveEnvironment);
@@ -39,9 +39,7 @@ export function TitleBar() {
           isMacOS ? "pl-20" : "pl-3",
         )}
       >
-        <span className="pk-truncate text-sm font-semibold tracking-tight">
-          {workspaceName ?? "PostKiddie"}
-        </span>
+        <WorkspaceSwitcher />
 
         <div className="flex-1" />
 

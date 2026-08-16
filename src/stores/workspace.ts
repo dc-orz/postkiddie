@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, subscribeWithSelector } from "zustand/middleware";
 
 import {
   environment as environmentIpc,
@@ -48,146 +48,154 @@ interface WorkspaceState {
   clearError: () => void;
 }
 
+/**
+ * `subscribeWithSelector` 是为跨 store 的清理准备的（见 `stores/session.ts`）：
+ * 换工作区时，请求编辑器与 git 面板里残留的上一个仓库的状态必须一起作废。
+ * 让它们订阅 `info.root` 的变化，比在每个切换入口手动调一遍重置可靠——
+ * 监听器在 `set` 的同一个同步栈里跑完，中间不存在「新树 + 旧请求」的渲染窗口。
+ */
 export const useWorkspace = create<WorkspaceState>()(
-  persist(
-    (set, get) => {
-      /** 打开/初始化成功后统一装载集合树与环境 */
-      async function load(info: WorkspaceInfo, path: string) {
-        const [tree, environments] = await Promise.all([ipc.tree(), ipc.environments()]);
+  subscribeWithSelector(
+    persist(
+      (set, get) => {
+        /** 打开/初始化成功后统一装载集合树与环境 */
+        async function load(info: WorkspaceInfo, path: string) {
+          const [tree, environments] = await Promise.all([ipc.tree(), ipc.environments()]);
 
-        const recent = [path, ...get().recent.filter((p) => p !== path)].slice(0, MAX_RECENT);
-        const active = get().activeEnvironment;
+          const recent = [path, ...get().recent.filter((p) => p !== path)].slice(0, MAX_RECENT);
+          const active = get().activeEnvironment;
 
-        set({
-          info,
-          tree,
-          environments,
-          recent,
-          status: "ready",
+          set({
+            info,
+            tree,
+            environments,
+            recent,
+            status: "ready",
+            error: null,
+            // 之前选的环境在新工作区里可能不存在，此时退回第一个
+            activeEnvironment:
+              active && environments.some((e) => e.name === active)
+                ? active
+                : (environments[0]?.name ?? null),
+          });
+        }
+
+        /** 统一的错误归置：记进 store 供 UI 展示，同时抛出让调用方能按 kind 分支 */
+        function fail(error: unknown): never {
+          const ipcError =
+            error instanceof IpcCallError ? error : new IpcCallError("invalid", String(error));
+          set({ status: "error", error: ipcError });
+          throw ipcError;
+        }
+
+        return {
+          info: null,
+          tree: [],
+          environments: [],
+          activeEnvironment: null,
+          status: "empty",
           error: null,
-          // 之前选的环境在新工作区里可能不存在，此时退回第一个
-          activeEnvironment:
-            active && environments.some((e) => e.name === active)
-              ? active
-              : (environments[0]?.name ?? null),
-        });
-      }
+          recent: [],
 
-      /** 统一的错误归置：记进 store 供 UI 展示，同时抛出让调用方能按 kind 分支 */
-      function fail(error: unknown): never {
-        const ipcError =
-          error instanceof IpcCallError ? error : new IpcCallError("invalid", String(error));
-        set({ status: "error", error: ipcError });
-        throw ipcError;
-      }
+          open: async (path) => {
+            set({ status: "loading", error: null });
+            try {
+              await load(await ipc.open(path), path);
+            } catch (error) {
+              fail(error);
+            }
+          },
 
-      return {
-        info: null,
-        tree: [],
-        environments: [],
-        activeEnvironment: null,
-        status: "empty",
-        error: null,
-        recent: [],
+          init: async (path, name) => {
+            set({ status: "loading", error: null });
+            try {
+              await load(await ipc.init(path, name), path);
+            } catch (error) {
+              fail(error);
+            }
+          },
 
-        open: async (path) => {
-          set({ status: "loading", error: null });
-          try {
-            await load(await ipc.open(path), path);
-          } catch (error) {
-            fail(error);
-          }
-        },
+          refresh: async () => {
+            if (!get().info) return;
+            try {
+              const [tree, environments] = await Promise.all([ipc.tree(), ipc.environments()]);
+              set({ tree, environments });
+            } catch (error) {
+              // 刷新失败不该把整个界面打回错误态——之前加载的树仍然可用
+              console.error("刷新工作区失败", error);
+            }
+          },
 
-        init: async (path, name) => {
-          set({ status: "loading", error: null });
-          try {
-            await load(await ipc.init(path, name), path);
-          } catch (error) {
-            fail(error);
-          }
-        },
+          createRequest: async (parent, name, method) => {
+            const id = await requestIpc.create(parent, name, method);
+            await get().refresh();
+            return id;
+          },
 
-        refresh: async () => {
-          if (!get().info) return;
-          try {
-            const [tree, environments] = await Promise.all([ipc.tree(), ipc.environments()]);
-            set({ tree, environments });
-          } catch (error) {
-            // 刷新失败不该把整个界面打回错误态——之前加载的树仍然可用
-            console.error("刷新工作区失败", error);
-          }
-        },
+          createFolder: async (parent, name) => {
+            const id = await folderIpc.create(parent, name);
+            await get().refresh();
+            return id;
+          },
 
-        createRequest: async (parent, name, method) => {
-          const id = await requestIpc.create(parent, name, method);
-          await get().refresh();
-          return id;
-        },
+          renameRequest: async (id, name) => {
+            const newId = await requestIpc.rename(id, name);
+            await get().refresh();
+            return newId;
+          },
 
-        createFolder: async (parent, name) => {
-          const id = await folderIpc.create(parent, name);
-          await get().refresh();
-          return id;
-        },
+          moveRequest: async (id, targetParent, index) => {
+            const newId = await requestIpc.move(id, targetParent, index);
+            await get().refresh();
+            return newId;
+          },
 
-        renameRequest: async (id, name) => {
-          const newId = await requestIpc.rename(id, name);
-          await get().refresh();
-          return newId;
-        },
+          deleteRequest: async (id) => {
+            await requestIpc.remove(id);
+            await get().refresh();
+          },
 
-        moveRequest: async (id, targetParent, index) => {
-          const newId = await requestIpc.move(id, targetParent, index);
-          await get().refresh();
-          return newId;
-        },
+          saveEnvironment: async (name, environment) => {
+            await environmentIpc.save(name, environment);
+            await get().refresh();
+          },
 
-        deleteRequest: async (id) => {
-          await requestIpc.remove(id);
-          await get().refresh();
-        },
+          createEnvironment: async (name) => {
+            const created = await environmentIpc.create(name);
+            await get().refresh();
+            // 刚建好就切过去，否则用户还得再去下拉框点一次
+            set({ activeEnvironment: created.name });
+            return created;
+          },
 
-        saveEnvironment: async (name, environment) => {
-          await environmentIpc.save(name, environment);
-          await get().refresh();
-        },
+          deleteEnvironment: async (name) => {
+            await environmentIpc.remove(name);
+            await get().refresh();
 
-        createEnvironment: async (name) => {
-          const created = await environmentIpc.create(name);
-          await get().refresh();
-          // 刚建好就切过去，否则用户还得再去下拉框点一次
-          set({ activeEnvironment: created.name });
-          return created;
-        },
+            // 删掉的正是当前选中的，退回到剩下的第一个
+            if (get().activeEnvironment === name) {
+              set({ activeEnvironment: get().environments[0]?.name ?? null });
+            }
+          },
 
-        deleteEnvironment: async (name) => {
-          await environmentIpc.remove(name);
-          await get().refresh();
+          setActiveEnvironment: (activeEnvironment) => set({ activeEnvironment }),
 
-          // 删掉的正是当前选中的，退回到剩下的第一个
-          if (get().activeEnvironment === name) {
-            set({ activeEnvironment: get().environments[0]?.name ?? null });
-          }
-        },
+          forgetRecent: (path) => set((s) => ({ recent: s.recent.filter((p) => p !== path) })),
 
-        setActiveEnvironment: (activeEnvironment) => set({ activeEnvironment }),
-
-        forgetRecent: (path) => set((s) => ({ recent: s.recent.filter((p) => p !== path) })),
-
-        clearError: () => set((s) => ({ error: null, status: s.info ? "ready" : "empty" })),
-      };
-    },
-    {
-      name: "postkiddie.workspace",
-      version: 1,
-      // 只持久化「下次启动需要的线索」，树和环境每次都从磁盘重新扫描——
-      // 磁盘是唯一事实来源，缓存它只会带来不一致
-      partialize: (s) => ({
-        recent: s.recent,
-        activeEnvironment: s.activeEnvironment,
-      }),
-    },
+          clearError: () => set((s) => ({ error: null, status: s.info ? "ready" : "empty" })),
+        };
+      },
+      {
+        name: "postkiddie.workspace",
+        version: 1,
+        // 只持久化「下次启动需要的线索」，树和环境每次都从磁盘重新扫描——
+        // 磁盘是唯一事实来源，缓存它只会带来不一致
+        partialize: (s) => ({
+          recent: s.recent,
+          activeEnvironment: s.activeEnvironment,
+        }),
+      },
+    ),
   ),
 );
 

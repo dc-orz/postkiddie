@@ -11,6 +11,8 @@ interface GitState {
   error: IpcCallError | null;
 
   refresh: () => Promise<void>;
+  /** 丢掉当前仓库的状态。换工作区时用——留着的话状态栏会挂着上一个仓库的分支。 */
+  reset: () => void;
   stage: (paths: string[]) => Promise<void>;
   unstage: (paths: string[]) => Promise<void>;
   discard: (paths: string[]) => Promise<void>;
@@ -58,6 +60,8 @@ export const useGit = create<GitState>()((set, get) => {
         console.error("获取 git 状态失败", error);
       }
     },
+
+    reset: () => set({ status: null, error: null, busy: false }),
 
     stage: (paths) => mutate(() => ipc.stage(paths)),
     unstage: (paths) => mutate(() => ipc.unstage(paths)),

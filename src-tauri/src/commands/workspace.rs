@@ -13,7 +13,7 @@ use crate::{
 
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceInfo {
     pub root: String,
@@ -27,6 +27,7 @@ pub struct WorkspaceInfo {
 /// 要求目录处于 git 仓库内——「用 git 管理」不是可选项，
 /// 若允许非 git 目录，后续所有版本化功能都要处处判空，得不偿失。
 #[tauri::command]
+#[specta::specta]
 pub async fn workspace_open(state: State<'_, AppState>, path: String) -> Result<WorkspaceInfo> {
     let root = PathBuf::from(&path);
     if !root.is_dir() {
@@ -52,6 +53,7 @@ pub async fn workspace_open(state: State<'_, AppState>, path: String) -> Result<
 /// 目录若尚不在任何 git 仓库内，会就地 `git init`——「用 git 管理」是本应用的前提，
 /// 让用户为此切到终端跑一条命令是没必要的摩擦。调用方必须已在 UI 上说明这一点。
 #[tauri::command]
+#[specta::specta]
 pub async fn workspace_init(
     state: State<'_, AppState>,
     path: String,
@@ -87,11 +89,13 @@ pub async fn workspace_init(
 /// 磁盘是唯一事实来源，所以刷新就是重扫，不存在需要维护的内存索引。
 /// 外部编辑、`git pull`、分支切换之后前端都调用这个命令。
 #[tauri::command]
+#[specta::specta]
 pub async fn workspace_tree(state: State<'_, AppState>) -> Result<Vec<TreeNode>> {
     state.workspace()?.scan()
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn workspace_environments(state: State<'_, AppState>) -> Result<Vec<Environment>> {
     // 返回合并了本机密钥的完整环境，UI 才能显示与编辑 secret 变量的真实值
     state.workspace()?.list_environments_resolved()

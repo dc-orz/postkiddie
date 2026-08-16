@@ -48,45 +48,76 @@ pub enum Error {
     UnresolvedVariable(String),
 
     #[error("请求超时（{0} ms）")]
-    Timeout(u64),
+    Timeout(u32),
 
     #[error("{0}")]
     Invalid(String),
 }
 
+/// 稳定的机器可读标识，前端据此分支。
+///
+/// 做成 enum 而非 `&'static str`：match 的穷尽性检查会强制新增变体时补上映射，
+/// 而字符串版只能靠注释叮嘱「记得同步维护」。它同时决定了导出的 TS 类型——
+/// enum 生成字面量联合，前端写错分支名会编译不过；字符串只会生成 `string`。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "kebab-case")]
+pub enum ErrorKind {
+    Io,
+    Yaml,
+    Json,
+    Http,
+    Url,
+    Git,
+    NotAGitRepo,
+    NoWorkspace,
+    PathEscape,
+    RequestNotFound,
+    UnresolvedVariable,
+    Timeout,
+    Invalid,
+}
+
 impl Error {
-    /// 稳定的机器可读标识，前端据此分支。新增变体时必须同步维护。
-    pub fn kind(&self) -> &'static str {
+    pub fn kind(&self) -> ErrorKind {
         match self {
-            Self::Io(_) => "io",
-            Self::Yaml(_) => "yaml",
-            Self::Json(_) => "json",
-            Self::Http(_) => "http",
-            Self::Url(_) => "url",
-            Self::Git { .. } => "git",
-            Self::NotAGitRepo(_) => "not-a-git-repo",
-            Self::NoWorkspace => "no-workspace",
-            Self::PathEscape(_) => "path-escape",
-            Self::RequestNotFound(_) => "request-not-found",
-            Self::UnresolvedVariable(_) => "unresolved-variable",
-            Self::Timeout(_) => "timeout",
-            Self::Invalid(_) => "invalid",
+            Self::Io(_) => ErrorKind::Io,
+            Self::Yaml(_) => ErrorKind::Yaml,
+            Self::Json(_) => ErrorKind::Json,
+            Self::Http(_) => ErrorKind::Http,
+            Self::Url(_) => ErrorKind::Url,
+            Self::Git { .. } => ErrorKind::Git,
+            Self::NotAGitRepo(_) => ErrorKind::NotAGitRepo,
+            Self::NoWorkspace => ErrorKind::NoWorkspace,
+            Self::PathEscape(_) => ErrorKind::PathEscape,
+            Self::RequestNotFound(_) => ErrorKind::RequestNotFound,
+            Self::UnresolvedVariable(_) => ErrorKind::UnresolvedVariable,
+            Self::Timeout(_) => ErrorKind::Timeout,
+            Self::Invalid(_) => ErrorKind::Invalid,
         }
     }
 }
 
-#[derive(Serialize)]
-struct ErrorPayload<'a> {
-    kind: &'a str,
-    message: String,
+/// 跨 IPC 边界时 [`Error`] 实际呈现的形状
+#[derive(Serialize, specta::Type)]
+pub struct IpcError {
+    pub kind: ErrorKind,
+    pub message: String,
 }
 
 impl Serialize for Error {
     fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
-        ErrorPayload {
+        IpcError {
             kind: self.kind(),
             message: self.to_string(),
         }
         .serialize(serializer)
+    }
+}
+
+/// `Error` 手写了 `Serialize`，没法 derive `Type`，这里把它委托给真正上线的形状。
+/// 漏掉这层，导出的错误类型就会和实际传输的 JSON 对不上。
+impl specta::Type for Error {
+    fn definition(types: &mut specta::Types) -> specta::datatype::DataType {
+        IpcError::definition(types)
     }
 }

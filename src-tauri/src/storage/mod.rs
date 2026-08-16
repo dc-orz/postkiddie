@@ -48,7 +48,7 @@ pub struct Workspace {
 }
 
 /// 本机私有的密钥存储：与环境文件同名归组，值不进 git。
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, specta::Type)]
 pub struct SecretStore {
     /// environment 名称 → (变量名 → 值)
     #[serde(default)]

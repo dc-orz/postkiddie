@@ -21,6 +21,7 @@ use crate::{
 
 /// 按路径读取请求。`id` 即请求相对工作区根的路径。
 #[tauri::command]
+#[specta::specta]
 pub async fn request_read(state: State<'_, AppState>, id: String) -> Result<HttpRequest> {
     let ws = state.workspace()?;
     let path = resolve_within(&ws.root, &id)?;
@@ -28,6 +29,7 @@ pub async fn request_read(state: State<'_, AppState>, id: String) -> Result<Http
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn request_save(
     state: State<'_, AppState>,
     id: String,
@@ -47,6 +49,7 @@ pub async fn request_save(
 /// 由 Rust 而非前端拼路径：文件名净化与重名消歧的规则只应存在一处，
 /// 在前端复制一份迟早会与磁盘上的真实行为漂移。
 #[tauri::command]
+#[specta::specta]
 pub async fn request_create(
     state: State<'_, AppState>,
     parent: Option<String>,
@@ -78,6 +81,7 @@ pub async fn request_create(
 /// 用 `git mv` 而非普通重命名：让 git 直接把它记成一次重命名而非「删一个加一个」，
 /// 历史与 blame 才连得上。git 不可用时退回普通改名，不阻塞用户。
 #[tauri::command]
+#[specta::specta]
 pub async fn request_rename(
     state: State<'_, AppState>,
     id: String,
@@ -153,11 +157,12 @@ fn rename_in_folder_order(dir: &Path, old_path: &Path, new_path: &Path) -> Resul
 ///
 /// `index` 为 None 表示追加到末尾。
 #[tauri::command]
+#[specta::specta]
 pub async fn request_move(
     state: State<'_, AppState>,
     id: String,
     target_parent: Option<String>,
-    index: Option<usize>,
+    index: Option<u32>,
 ) -> Result<String> {
     let ws = state.workspace()?;
     let old_path = resolve_within(&ws.root, &id)?;
@@ -208,7 +213,8 @@ pub async fn request_move(
     // 若只把被拖动项写进去，其余条目的相对位置会跟着漂。
     let mut order = current_order(&target_dir)?;
     order.retain(|n| n != &new_name);
-    let at = index.unwrap_or(order.len()).min(order.len());
+    // 同 git_log：IPC 边界统一用固定宽度整数，进来后再落回 usize
+    let at = index.map_or(order.len(), |i| i as usize).min(order.len());
     order.insert(at, new_name);
 
     let mut target_meta = read_folder_meta(&target_dir)?;
@@ -225,6 +231,7 @@ pub async fn request_move(
 /// 顺序集中写在 `_folder.yaml` 的 `order` 里，所以一次拖拽只产生一处 diff——
 /// 这正是当初不在每个请求里放 `seq` 序号的原因。
 #[tauri::command]
+#[specta::specta]
 pub async fn folder_reorder(
     state: State<'_, AppState>,
     folder: Option<String>,
@@ -241,6 +248,7 @@ pub async fn folder_reorder(
 
 /// 新建文件夹，返回其 id（相对工作区根的路径）。
 #[tauri::command]
+#[specta::specta]
 pub async fn folder_create(
     state: State<'_, AppState>,
     parent: Option<String>,
@@ -263,6 +271,7 @@ pub async fn folder_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn request_delete(state: State<'_, AppState>, id: String) -> Result<()> {
     let ws = state.workspace()?;
     let path = resolve_within(&ws.root, &id)?;
@@ -278,6 +287,7 @@ pub async fn request_delete(state: State<'_, AppState>, id: String) -> Result<()
 /// 接收的是**完整的请求对象**而不是路径，因为用户经常在未保存的编辑态下点发送；
 /// 若从磁盘读取会丢掉当前编辑内容。
 #[tauri::command]
+#[specta::specta]
 pub async fn request_send(
     state: State<'_, AppState>,
     request: HttpRequest,
@@ -309,6 +319,7 @@ pub async fn request_send(
 /// 在不发送的前提下，列出请求里引用了但当前无法解析的变量。
 /// 前端用它做发送前的静态提示，比发出去再报错体验好。
 #[tauri::command]
+#[specta::specta]
 pub async fn request_check_variables(
     state: State<'_, AppState>,
     request: HttpRequest,

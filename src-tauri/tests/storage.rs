@@ -97,7 +97,7 @@ fn gitignore_entry_is_not_duplicated_across_opens() {
 fn open_rejects_directory_without_config() {
     let plain = tempfile::tempdir().unwrap();
     let err = Workspace::open(plain.path()).expect_err("缺少 postkiddie.yaml 时应当报错");
-    assert_eq!(err.kind(), "invalid");
+    assert_eq!(err.kind(), postkiddie_lib::error::ErrorKind::Invalid);
 }
 
 #[test]

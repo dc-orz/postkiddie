@@ -1,65 +1,44 @@
 /**
  * Tauri IPC 封装。
  *
- * 组件不直接调用 `invoke`，一律经过这里，以获得：
- * - 参数与返回值的静态类型
- * - 统一的错误规整（Rust 返回的是 `{ kind, message }`，不是 Error 实例）
- * - 一处可插入日志、重试、耗时统计的切面
+ * 命令签名与类型全部由 specta 从 Rust 生成（`types/bindings.ts`），
+ * 这一层只负责把生成的 Result 形态转成前端惯用的「成功返回值 / 失败抛异常」，
+ * 并保留 `IpcCallError` 以便按 `kind` 分支。
+ *
+ * 为什么不让组件直接用 `commands`：生成的接口返回
+ * `{ status: "ok" } | { status: "error" }`，每个调用点都要展开一次；
+ * 而错误在这里几乎总是要么向上抛、要么弹窗，判别式联合只是噪声。
  */
 
-import { invoke } from "@tauri-apps/api/core";
-
-import type {
-  BranchInfo,
-  CommitInfo,
-  CookieGroup,
-  Environment,
-  GitStatus,
-  HttpMethod,
-  HttpRequest,
-  HttpResponse,
-  IpcError,
-  IpcErrorKind,
-  TreeNode,
-  WorkspaceInfo,
-} from "@/types/api";
+import type { Environment, ErrorKind, HttpMethod, HttpRequest, IpcError } from "@/types/api";
+import { commands } from "@/types/bindings";
 
 /**
  * IPC 调用失败时抛出的错误。
  *
  * 保留 `kind` 供调用方分支处理（如 `no-workspace` 引导用户选目录），
  * 避免靠匹配 message 文本做逻辑判断——那会在改文案时静默失效。
+ * `kind` 的取值由 Rust 的 `ErrorKind` 枚举生成，写错分支名编译不过。
  */
 export class IpcCallError extends Error {
-  readonly kind: IpcErrorKind;
+  readonly kind: ErrorKind;
 
-  constructor(kind: IpcErrorKind, message: string) {
+  constructor(kind: ErrorKind, message: string) {
     super(message);
     this.name = "IpcCallError";
     this.kind = kind;
   }
 }
 
-function isIpcError(value: unknown): value is IpcError {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "kind" in value &&
-    "message" in value &&
-    typeof (value as IpcError).message === "string"
-  );
-}
+type IpcResult<T> = { status: "ok"; data: T } | { status: "error"; error: IpcError };
 
-async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-  try {
-    return await invoke<T>(command, args);
-  } catch (raw) {
-    if (isIpcError(raw)) {
-      throw new IpcCallError(raw.kind, raw.message);
-    }
-    // panic 或序列化失败等非预期情况：保留原文，避免掩盖真实原因
-    throw new IpcCallError("invalid", String(raw));
+/** 把生成的 Result 摊平：成功取值，失败抛 `IpcCallError` */
+async function unwrap<T>(call: Promise<IpcResult<T>>): Promise<T> {
+  const result = await call;
+  if (result.status === "error") {
+    throw new IpcCallError(result.error.kind, result.error.message);
   }
+  return result.data;
 }
 
 // ---------------------------------------------------------------------------
@@ -67,10 +46,10 @@ async function call<T>(command: string, args?: Record<string, unknown>): Promise
 // ---------------------------------------------------------------------------
 
 export const workspace = {
-  open: (path: string) => call<WorkspaceInfo>("workspace_open", { path }),
-  init: (path: string, name: string) => call<WorkspaceInfo>("workspace_init", { path, name }),
-  tree: () => call<TreeNode[]>("workspace_tree"),
-  environments: () => call<Environment[]>("workspace_environments"),
+  open: (path: string) => unwrap(commands.workspaceOpen(path)),
+  init: (path: string, name: string) => unwrap(commands.workspaceInit(path, name)),
+  tree: () => unwrap(commands.workspaceTree()),
+  environments: () => unwrap(commands.workspaceEnvironments()),
 };
 
 // ---------------------------------------------------------------------------
@@ -78,38 +57,32 @@ export const workspace = {
 // ---------------------------------------------------------------------------
 
 export const request = {
-  read: (id: string) => call<HttpRequest>("request_read", { id }),
-  save: (id: string, req: HttpRequest) => call<void>("request_save", { id, request: req }),
+  read: (id: string) => unwrap(commands.requestRead(id)),
+  save: (id: string, req: HttpRequest) => unwrapVoid(commands.requestSave(id, req)),
   /** 返回新请求的 id。路径拼装与重名消歧都在 Rust 侧完成。 */
   create: (parent: string | null, name: string, method?: HttpMethod) =>
-    call<string>("request_create", { parent, name, method: method ?? null }),
+    unwrap(commands.requestCreate(parent, name, method ?? null)),
   /** 同时改文件名与 YAML 里的 name，返回新的 id */
-  rename: (id: string, name: string) => call<string>("request_rename", { id, name }),
+  rename: (id: string, name: string) => unwrap(commands.requestRename(id, name)),
   /**
    * 移动到目标目录的指定位置，返回新的 id。
    * index 为 null 表示追加到末尾；targetParent 为 null 表示集合根。
    */
   move: (id: string, targetParent: string | null, index: number | null) =>
-    call<string>("request_move", { id, targetParent, index }),
-  remove: (id: string) => call<void>("request_delete", { id }),
+    unwrap(commands.requestMove(id, targetParent, index)),
+  remove: (id: string) => unwrapVoid(commands.requestDelete(id)),
   send: (req: HttpRequest, environment?: string) =>
-    call<HttpResponse>("request_send", {
-      request: req,
-      environment: environment ?? null,
-    }),
+    unwrap(commands.requestSend(req, environment ?? null)),
   checkVariables: (req: HttpRequest, environment?: string) =>
-    call<string[]>("request_check_variables", {
-      request: req,
-      environment: environment ?? null,
-    }),
+    unwrap(commands.requestCheckVariables(req, environment ?? null)),
 };
 
 export const folder = {
   /** 返回新文件夹的 id */
-  create: (parent: string | null, name: string) => call<string>("folder_create", { parent, name }),
+  create: (parent: string | null, name: string) => unwrap(commands.folderCreate(parent, name)),
   /** 重排某目录下的显示顺序；order 是文件名（含扩展名）数组 */
-  reorder: (folder: string | null, order: string[]) =>
-    call<void>("folder_reorder", { folder, order }),
+  reorder: (folderId: string | null, order: string[]) =>
+    unwrapVoid(commands.folderReorder(folderId, order)),
 };
 
 // ---------------------------------------------------------------------------
@@ -121,10 +94,9 @@ export const environment = {
    * 保存环境。传入的对象里可以带 secret 变量的真实值——
    * Rust 侧会把它们抽到本机密钥库，不会写进 git 跟踪的文件。
    */
-  save: (name: string, env: Environment) =>
-    call<void>("environment_save", { name, environment: env }),
-  create: (name: string) => call<Environment>("environment_create", { name }),
-  remove: (name: string) => call<void>("environment_delete", { name }),
+  save: (name: string, env: Environment) => unwrapVoid(commands.environmentSave(name, env)),
+  create: (name: string) => unwrap(commands.environmentCreate(name)),
+  remove: (name: string) => unwrapVoid(commands.environmentDelete(name)),
 };
 
 // ---------------------------------------------------------------------------
@@ -132,36 +104,40 @@ export const environment = {
 // ---------------------------------------------------------------------------
 
 export const cookie = {
-  list: () => call<CookieGroup[]>("cookie_list"),
+  list: () => unwrap(commands.cookieList()),
   remove: (name: string, domain: string, path: string) =>
-    call<void>("cookie_delete", { name, domain, path }),
+    unwrapVoid(commands.cookieDelete(name, domain, path)),
   /** 清掉某个域及其子域的全部 cookie，相当于退出登录 */
-  clearDomain: (domain: string) => call<void>("cookie_clear_domain", { domain }),
+  clearDomain: (domain: string) => unwrapVoid(commands.cookieClearDomain(domain)),
   /** raw 可以是 Cookie 头的值，也可以是整条 curl 命令。返回导入条数。 */
-  import: (url: string, raw: string) => call<number>("cookie_import", { url, raw }),
+  import: (url: string, raw: string) => unwrap(commands.cookieImport(url, raw)),
   /** 打开内置登录窗口 */
-  loginOpen: (url: string) => call<void>("cookie_login_open", { url }),
+  loginOpen: (url: string) => unwrapVoid(commands.cookieLoginOpen(url)),
   /** 从登录窗口收取 cookie，返回条数 */
-  capture: (url: string, closeWindow = true) =>
-    call<number>("cookie_capture", { url, closeWindow }),
+  capture: (url: string, closeWindow = true) => unwrap(commands.cookieCapture(url, closeWindow)),
 };
 
 // ---------------------------------------------------------------------------
 // Git
 // ---------------------------------------------------------------------------
 
+/** Rust 的 `()` 会生成为 `null`；无返回值的命令摊平成 void，免得调用方到处接一个没用的 null */
+async function unwrapVoid(call: Promise<IpcResult<null>>): Promise<void> {
+  await unwrap(call);
+}
+
 export const git = {
-  status: () => call<GitStatus>("git_status"),
-  stage: (paths: string[]) => call<void>("git_stage", { paths }),
-  unstage: (paths: string[]) => call<void>("git_unstage", { paths }),
-  discard: (paths: string[]) => call<void>("git_discard", { paths }),
-  commit: (message: string) => call<string>("git_commit", { message }),
-  diff: (path: string | null, staged: boolean) => call<string>("git_diff", { path, staged }),
-  log: (limit?: number) => call<CommitInfo[]>("git_log", { limit: limit ?? null }),
-  branches: () => call<BranchInfo[]>("git_branches"),
-  checkout: (branch: string, create = false) => call<void>("git_checkout", { branch, create }),
-  fetch: () => call<void>("git_fetch"),
-  pull: (rebase = true) => call<void>("git_pull", { rebase }),
-  push: (setUpstream = false) => call<void>("git_push", { setUpstream }),
-  showFile: (rev: string, path: string) => call<string>("git_show_file", { rev, path }),
+  status: () => unwrap(commands.gitStatus()),
+  stage: (paths: string[]) => unwrapVoid(commands.gitStage(paths)),
+  unstage: (paths: string[]) => unwrapVoid(commands.gitUnstage(paths)),
+  discard: (paths: string[]) => unwrapVoid(commands.gitDiscard(paths)),
+  commit: (message: string) => unwrap(commands.gitCommit(message)),
+  diff: (path: string | null, staged: boolean) => unwrap(commands.gitDiff(path, staged)),
+  log: (limit?: number) => unwrap(commands.gitLog(limit ?? null)),
+  branches: () => unwrap(commands.gitBranches()),
+  checkout: (branch: string, create = false) => unwrapVoid(commands.gitCheckout(branch, create)),
+  fetch: () => unwrapVoid(commands.gitFetch()),
+  pull: (rebase = true) => unwrapVoid(commands.gitPull(rebase)),
+  push: (setUpstream = false) => unwrapVoid(commands.gitPush(setUpstream)),
+  showFile: (rev: string, path: string) => unwrap(commands.gitShowFile(rev, path)),
 };

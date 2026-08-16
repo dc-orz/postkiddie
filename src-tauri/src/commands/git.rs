@@ -26,27 +26,32 @@ macro_rules! blocking {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn git_status(state: State<'_, AppState>) -> Result<GitStatus> {
     blocking!(state, |git, root| git.status(&root))
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn git_stage(state: State<'_, AppState>, paths: Vec<String>) -> Result<()> {
     blocking!(state, |git, root| git.stage(&root, &paths))
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn git_unstage(state: State<'_, AppState>, paths: Vec<String>) -> Result<()> {
     blocking!(state, |git, root| git.unstage(&root, &paths))
 }
 
 /// 丢弃改动。破坏性且不可撤销，前端必须先弹确认框。
 #[tauri::command]
+#[specta::specta]
 pub async fn git_discard(state: State<'_, AppState>, paths: Vec<String>) -> Result<()> {
     blocking!(state, |git, root| git.discard(&root, &paths))
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn git_commit(state: State<'_, AppState>, message: String) -> Result<String> {
     if message.trim().is_empty() {
         return Err(Error::Invalid("提交信息不能为空".to_owned()));
@@ -55,6 +60,7 @@ pub async fn git_commit(state: State<'_, AppState>, message: String) -> Result<S
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn git_diff(
     state: State<'_, AppState>,
     path: Option<String>,
@@ -64,39 +70,48 @@ pub async fn git_diff(
 }
 
 #[tauri::command]
-pub async fn git_log(state: State<'_, AppState>, limit: Option<usize>) -> Result<Vec<CommitInfo>> {
-    let limit = limit.unwrap_or(50).min(500);
+#[specta::specta]
+// IPC 边界上不用 usize：它的宽度随平台变化，跨语言传递本就不严谨，
+// specta 也会因精度风险直接拒绝导出
+pub async fn git_log(state: State<'_, AppState>, limit: Option<u32>) -> Result<Vec<CommitInfo>> {
+    let limit = limit.unwrap_or(50).min(500) as usize;
     blocking!(state, |git, root| git.log(&root, limit))
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn git_branches(state: State<'_, AppState>) -> Result<Vec<BranchInfo>> {
     blocking!(state, |git, root| git.branches(&root))
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn git_checkout(state: State<'_, AppState>, branch: String, create: bool) -> Result<()> {
     blocking!(state, |git, root| git.checkout(&root, &branch, create))
 }
 
 /// 只更新远程引用，不动工作区。供后台定时轮询「远端有无新提交」。
 #[tauri::command]
+#[specta::specta]
 pub async fn git_fetch(state: State<'_, AppState>) -> Result<()> {
     blocking!(state, |git, root| git.fetch(&root))
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn git_pull(state: State<'_, AppState>, rebase: bool) -> Result<()> {
     blocking!(state, |git, root| git.pull(&root, rebase))
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn git_push(state: State<'_, AppState>, set_upstream: bool) -> Result<()> {
     blocking!(state, |git, root| git.push(&root, set_upstream))
 }
 
 /// 读取某个历史版本下的文件内容，用于「与历史版本对比」。
 #[tauri::command]
+#[specta::specta]
 pub async fn git_show_file(
     state: State<'_, AppState>,
     rev: String,

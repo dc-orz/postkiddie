@@ -40,7 +40,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// `enabled: false` 表示「保留但不发送」，等价于 Postman 里取消勾选。
 /// 这比直接删除更实用：调试用的 header 可以留在文件里随时打开。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyValue {
     pub name: String,
@@ -55,7 +55,9 @@ pub struct KeyValue {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default, specta::Type,
+)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum HttpMethod {
     #[default]
@@ -98,7 +100,7 @@ impl HttpMethod {
 /// 文本类内容统一放 `content` 字段并用 YAML block scalar（`|`）书写：
 /// 原文逐行落盘，无转义，diff 可以精确到 JSON 的某一行。
 /// 这正是选 YAML 而非 JSON 作为存储格式的核心理由。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default, specta::Type)]
 #[serde(
     tag = "type",
     rename_all = "kebab-case",
@@ -156,7 +158,7 @@ pub enum RequestBody {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct MultipartField {
     pub name: String,
@@ -182,7 +184,7 @@ pub struct MultipartField {
 
 /// 认证配置。`Inherit` 表示沿用父文件夹 / 集合的设置，
 /// 这是最常用的情形——整个集合共用一套 token，不该在每个请求里重复。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, specta::Type)]
 #[serde(
     tag = "type",
     rename_all = "kebab-case",
@@ -213,7 +215,7 @@ pub enum Auth {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, specta::Type)]
 #[serde(rename_all = "kebab-case")]
 pub enum ApiKeyPlacement {
     #[default]
@@ -225,7 +227,7 @@ pub enum ApiKeyPlacement {
 // 请求级设置
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RequestSettings {
     /// 毫秒。0 表示不超时。
@@ -233,7 +235,7 @@ pub struct RequestSettings {
         default = "default_timeout",
         skip_serializing_if = "is_default_timeout"
     )]
-    pub timeout_ms: u64,
+    pub timeout_ms: u32,
 
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub follow_redirects: bool,
@@ -283,7 +285,7 @@ impl Default for RequestSettings {
 /// **没有 `id` 字段**，这是刻意的：请求的身份就是它相对工作区根的路径。
 /// 好处是重命名/移动的语义天然正确、复制文件不会撞 ID、
 /// 也不存在两个人各自新建请求生成同一 UUID 的合并冲突。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct HttpRequest {
     pub name: String,
@@ -326,7 +328,7 @@ pub struct HttpRequest {
 /// 而不是几十个文件的序号全体位移。
 ///
 /// 未列入 `order` 的条目按文件名排在其后——外部新建的文件不会消失，也不需要立即维护顺序。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FolderMeta {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -352,7 +354,7 @@ pub struct FolderMeta {
 // ---------------------------------------------------------------------------
 
 /// 一个环境 = `environments/<name>.yaml`。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Environment {
     pub name: String,
@@ -375,7 +377,7 @@ pub struct Environment {
 /// `secret: true` 的变量**其 `value` 不会写入 git 跟踪的文件**——
 /// 落盘时被清空，真实值存放于工作区内被 gitignore 的 `.postkiddie/secrets.yaml`。
 /// 这样团队共享的是「有哪些密钥要填」的契约，而不是密钥本身。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvVariable {
     pub name: String,
@@ -398,7 +400,7 @@ pub struct EnvVariable {
 // ---------------------------------------------------------------------------
 
 /// 工作区根目录下的 `postkiddie.yaml`，标记「这是一个 PostKiddie 工作区」。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceConfig {
     /// schema 版本。破坏性变更时递增，客户端据此决定迁移或提示升级。
@@ -455,10 +457,10 @@ fn is_true(v: &bool) -> bool {
 fn is_false(v: &bool) -> bool {
     !*v
 }
-fn default_timeout() -> u64 {
+fn default_timeout() -> u32 {
     30_000
 }
-fn is_default_timeout(v: &u64) -> bool {
+fn is_default_timeout(v: &u32) -> bool {
     *v == default_timeout()
 }
 fn default_max_redirects() -> u8 {

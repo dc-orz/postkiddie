@@ -31,7 +31,7 @@ use super::interpolate::VariableScope;
 // 响应模型
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct HttpResponse {
     pub status: u16,
@@ -41,12 +41,12 @@ pub struct HttpResponse {
     pub headers: Vec<KeyValue>,
     pub body: ResponseBody,
     /// 响应体字节数（解压后）
-    pub size_bytes: u64,
+    pub size_bytes: u32,
     /// 从发起到收完响应体的总耗时
-    pub elapsed_ms: u64,
+    pub elapsed_ms: u32,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ResponseBody {
     /// 可按 UTF-8 解码的内容，直接给前端渲染
@@ -160,7 +160,7 @@ pub async fn execute(
     let mut builder = client.request(method, url.clone());
 
     if settings.timeout_ms > 0 {
-        builder = builder.timeout(Duration::from_millis(settings.timeout_ms));
+        builder = builder.timeout(Duration::from_millis(u64::from(settings.timeout_ms)));
     }
 
     let mut user_set_cookie_header = false;
@@ -214,7 +214,7 @@ pub async fn execute(
         .collect();
 
     let bytes = response.bytes().await?;
-    let elapsed_ms = started.elapsed().as_millis() as u64;
+    let elapsed_ms = started.elapsed().as_millis() as u32;
 
     Ok(ExecuteOutcome {
         response: HttpResponse {
@@ -222,7 +222,7 @@ pub async fn execute(
             status_text: status.canonical_reason().unwrap_or("").to_owned(),
             final_url,
             headers,
-            size_bytes: bytes.len() as u64,
+            size_bytes: bytes.len() as u32,
             body: decode_body(&bytes, content_type.as_deref()),
             elapsed_ms,
         },

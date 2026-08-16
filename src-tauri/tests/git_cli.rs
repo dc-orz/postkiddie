@@ -67,7 +67,7 @@ fn rejects_directory_outside_any_repo() {
     let err = git
         .discover_repo(plain.path())
         .expect_err("非仓库目录应当报错");
-    assert_eq!(err.kind(), "not-a-git-repo");
+    assert_eq!(err.kind(), postkiddie_lib::error::ErrorKind::NotAGitRepo);
 }
 
 #[test]
@@ -197,7 +197,7 @@ fn empty_commit_message_is_rejected_by_git() {
     let err = git
         .commit(dir.path(), "   \n\n  ")
         .expect_err("空消息应当被拒绝");
-    assert_eq!(err.kind(), "git");
+    assert_eq!(err.kind(), postkiddie_lib::error::ErrorKind::Git);
 }
 
 #[test]
@@ -265,7 +265,7 @@ fn push_without_remote_fails_fast_instead_of_hanging() {
     let started = std::time::Instant::now();
     let err = git.push(dir.path(), false).expect_err("没有远程时应当报错");
 
-    assert_eq!(err.kind(), "git");
+    assert_eq!(err.kind(), postkiddie_lib::error::ErrorKind::Git);
     assert!(
         started.elapsed() < std::time::Duration::from_secs(10),
         "应当立即失败而非等待输入，实际耗时 {:?}",
@@ -314,5 +314,5 @@ fn move_path_fails_for_untracked_file() {
     let err = git
         .move_path(dir.path(), "新建的.yaml", "改名的.yaml")
         .expect_err("未跟踪的文件应当 mv 失败");
-    assert_eq!(err.kind(), "git");
+    assert_eq!(err.kind(), postkiddie_lib::error::ErrorKind::Git);
 }

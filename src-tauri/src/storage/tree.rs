@@ -18,7 +18,7 @@ use super::paths::to_relative_slash;
 pub const REQUEST_EXT: &str = "yaml";
 pub const FOLDER_META_FILE: &str = "_folder.yaml";
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum TreeNode {
     #[serde(rename_all = "camelCase")]

@@ -145,10 +145,34 @@ lib/ipc.ts    唯一的 IPC 出口
 
 ## 4. 已知取舍与后续演进
 
-**类型双写。** `src/types/api.ts` 是 Rust 模型的手工镜像，存在漂移风险。
-一期刻意不引入代码生成，是为了让新贡献者读两个文件就能看懂整条数据链路。
-**触发条件**：当模型字段数翻倍、或出现第一次因漂移导致的线上问题时，引入
-`tauri-specta` 从 Rust 自动生成。
+**类型双写（已解决）。** 曾经 `src/types/api.ts` 是 Rust 模型的手工镜像，
+预设的触发条件是「出现第一次因漂移导致的问题」。实际触发了两次：
+
+1. `RequestSettings` 漏了 `rename_all`，后端写 `timeout_ms`、前端读 `timeoutMs`，
+   用户改的超时与 TLS 开关每次保存后悄悄变回默认值。
+2. `Environment.variables` 带着 `skip_serializing_if`，空环境发到前端缺这个字段，
+   `.some()` 抛异常、React 卸掉整棵子树，表现为「点开环境管理是一片黑」。
+
+现在类型与命令签名都由 `tauri-specta` 从 Rust 生成到 `src/types/bindings.ts`
+（勿手改），`types/api.ts` 退化成别名层，`lib/ipc.ts` 只负责把生成的
+`{ status: "ok" | "error" }` 摊平成「返回值 / 抛异常」并保留 `IpcCallError`。
+
+**生成的类型带 `_Serialize` / `_Deserialize` 两个方向**，这不是噪声而是要害：
+`skip_serializing_if` 让同一个结构在两个方向上形状不同（出去时省略默认值，
+进来时缺字段用默认值），specta 直接拒绝把它们合并成一个类型。上面两个 bug
+都源于把两者当成一回事。前端视角是反的——**收到**的是 `_Serialize`，
+**发出**的是 `_Deserialize`；日常用 `types/api.ts` 里的无后缀别名即可。
+
+引入它还顺带逼出了三处本就该改的东西：`ErrorKind` 从 `&'static str` 变成
+真正的枚举（match 穷尽性替代了「记得同步维护」的注释，且导出为字面量联合）；
+IPC 边界上的 `u64`/`usize` 收窄为 `u32`（JS 的 number 装不下 64 位整数，
+`usize` 的宽度还随平台变）；`SettingsTab` 的入参改成 `Required<RequestSettings>`，
+残缺对象再也传不进去。
+
+**代价**：`tauri-specta` 2.x 至今仍是 release candidate（当前 `2.0.0-rc.25`），
+rc 之间有过破坏性改动。接受它是因为替代品更差——手写已经被证明会静默出错，
+而自己写生成器是重复造轮子。CI 里有一步 `git diff --exit-code src/types/bindings.ts`：
+改了 Rust 模型却没提交重新生成的绑定，构建会红。
 
 **不保留用户手写的 YAML 注释。** 序列化走 serde，往返一次会丢掉注释。
 要保留需换成基于 AST 的 YAML 库（如 `yaml_rust2`）并自行维护节点映射，

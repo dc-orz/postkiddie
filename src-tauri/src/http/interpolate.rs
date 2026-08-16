@@ -149,7 +149,7 @@ mod tests {
     #[test]
     fn errors_on_undefined_variable() {
         let err = scope(&[]).expand("{{missing}}/x").unwrap_err();
-        assert_eq!(err.kind(), "unresolved-variable");
+        assert_eq!(err.kind(), crate::error::ErrorKind::UnresolvedVariable);
     }
 
     #[test]

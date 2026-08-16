@@ -19,6 +19,7 @@ use crate::{
 
 /// 保存环境。密钥值会被抽走存到本机，不会进入 git。
 #[tauri::command]
+#[specta::specta]
 pub async fn environment_save(
     state: State<'_, AppState>,
     name: String,
@@ -31,6 +32,7 @@ pub async fn environment_save(
 
 /// 新建空环境。重名直接报错而不是静默覆盖——已有环境里可能存着填好的密钥。
 #[tauri::command]
+#[specta::specta]
 pub async fn environment_create(state: State<'_, AppState>, name: String) -> Result<Environment> {
     let ws = state.workspace()?;
 
@@ -53,6 +55,7 @@ pub async fn environment_create(state: State<'_, AppState>, name: String) -> Res
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn environment_delete(state: State<'_, AppState>, name: String) -> Result<()> {
     state.workspace()?.delete_environment(&name)?;
     tracing::info!(name = %name, "已删除环境");

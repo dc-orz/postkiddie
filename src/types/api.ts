@@ -1,21 +1,85 @@
 /**
- * Rust 侧数据模型的 TypeScript 镜像。
+ * IPC 类型的前端入口。
  *
- * ⚠️ 这些类型必须与 `src-tauri/src/domain/model.rs`、`src-tauri/src/git/mod.rs`
- * 手工保持一致。改动任一侧时请同步另一侧，并跑 `pnpm check`。
+ * 类型本体由 specta 从 Rust 生成，见 `bindings.ts`（勿手改）。
+ * 这里只做两件事：给生成的名字起个顺手的别名，以及补充纯前端的常量。
  *
- * 演进计划：请求种类稳定后引入 `tauri-specta`，从 Rust 自动生成本文件与
- * `ipc.ts` 的调用签名，彻底消除手工同步。一期刻意不引入，是为了让新贡献者
- * 只需读两个文件就能看懂整条数据链路。详见 docs/architecture.md。
+ * ## 为什么名字带 `_Serialize` / `_Deserialize`
+ *
+ * 因为 `skip_serializing_if` 让同一个 Rust 结构在两个方向上形状不同：
+ * 序列化出去时「保持默认的字段不发」，反序列化进来时「缺字段用默认值」。
+ * 一个类型无法同时描述两者，specta 会拒绝把它们合并——这正是好事：
+ * 项目里两次静默故障（超时设置被还原、环境弹框黑屏）都源于把两者当成一回事。
+ *
+ * 前端的视角是反的，别被名字绕进去：
+ * - **收到**的东西是 Rust 序列化的产物 → `_Serialize`
+ * - **发出**的东西要被 Rust 反序列化 → `_Deserialize`
+ *
+ * 日常用下面这些无后缀别名即可，它们一律指向 `_Serialize`。
+ * 好在 `_Serialize` 的字段只会比 `_Deserialize` 更全（必填 ⊇ 可选），
+ * 所以拿它当入参传回去也是类型安全的，无需两套写法。
  */
 
+import type {
+  BranchInfo_Serialize,
+  CommitInfo,
+  Cookie_Serialize,
+  CookieGroup_Serialize,
+  Environment_Serialize,
+  EnvVariable_Serialize,
+  GitStatus_Serialize,
+  HttpRequest_Serialize,
+  HttpResponse_Serialize,
+  KeyValue_Serialize,
+  MultipartField_Serialize,
+  RequestBody_Serialize,
+  RequestSettings_Serialize,
+  StatusEntry_Serialize,
+  TreeNode,
+} from "./bindings";
+
+export type {
+  ApiKeyPlacement,
+  Auth,
+  ErrorKind,
+  FileState,
+  HttpMethod,
+  IpcError,
+  ResponseBody,
+  TreeNode,
+  WorkspaceInfo,
+} from "./bindings";
+
+export type KeyValue = KeyValue_Serialize;
+export type MultipartField = MultipartField_Serialize;
+export type RequestBody = RequestBody_Serialize;
+export type RequestSettings = RequestSettings_Serialize;
+export type HttpRequest = HttpRequest_Serialize;
+export type HttpResponse = HttpResponse_Serialize;
+export type EnvVariable = EnvVariable_Serialize;
+export type Environment = Environment_Serialize;
+export type Cookie = Cookie_Serialize;
+export type CookieGroup = CookieGroup_Serialize;
+export type GitStatus = GitStatus_Serialize;
+export type StatusEntry = StatusEntry_Serialize;
+export type BranchInfo = BranchInfo_Serialize;
+export type { CommitInfo };
+
+/** 集合树里的请求节点。窄化出来供只关心请求的地方使用。 */
+export type RequestNode = Extract<TreeNode, { kind: "request" }>;
+
 // ---------------------------------------------------------------------------
-// 基础
+// 纯前端常量
 // ---------------------------------------------------------------------------
 
-export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
-
-export const HTTP_METHODS: readonly HttpMethod[] = [
+/**
+ * 方法选择器的选项顺序。
+ *
+ * 不从 Rust 生成：`HttpMethod` 是联合类型，取不出运行时的值列表，
+ * 而这里的**顺序**是 UI 决定的（按使用频率），不属于领域模型。
+ * 类型标注会保证漏写或拼错时编译失败。
+ */
+export const HTTP_METHODS = [
   "GET",
   "POST",
   "PUT",
@@ -23,237 +87,4 @@ export const HTTP_METHODS: readonly HttpMethod[] = [
   "DELETE",
   "HEAD",
   "OPTIONS",
-] as const;
-
-export interface KeyValue {
-  name: string;
-  value: string;
-  /** 缺省视为 true —— Rust 侧只在为 false 时落盘 */
-  enabled?: boolean;
-  description?: string;
-}
-
-// ---------------------------------------------------------------------------
-// 请求
-// ---------------------------------------------------------------------------
-
-export type RequestBody =
-  | { type: "none" }
-  | { type: "json"; content: string }
-  | { type: "text"; content: string; contentType?: string }
-  | { type: "xml"; content: string }
-  | { type: "form-urlencoded"; fields: KeyValue[] }
-  | { type: "multipart"; fields: MultipartField[] }
-  | { type: "binary"; file: string; contentType?: string }
-  | {
-      type: "graphql";
-      query: string;
-      variables?: string;
-      operationName?: string;
-    };
-
-export interface MultipartField {
-  name: string;
-  value?: string;
-  file?: string;
-  contentType?: string;
-  enabled?: boolean;
-}
-
-export type Auth =
-  | { type: "inherit" }
-  | { type: "none" }
-  | { type: "basic"; username: string; password: string }
-  | { type: "bearer"; token: string }
-  | {
-      type: "api-key";
-      key: string;
-      value: string;
-      placement: "header" | "query";
-    };
-
-export interface RequestSettings {
-  timeoutMs: number;
-  followRedirects: boolean;
-  maxRedirects: number;
-  verifyTls: boolean;
-  decompress: boolean;
-  /** 关闭后既不附带已存 cookie，也不保存响应返回的 cookie */
-  sendCookies: boolean;
-}
-
-export interface HttpRequest {
-  name: string;
-  method: HttpMethod;
-  url: string;
-  description?: string;
-  params?: KeyValue[];
-  headers?: KeyValue[];
-  body?: RequestBody;
-  auth?: Auth;
-  /**
-   * 注意是 `Partial`：Rust 只序列化偏离默认的字段，所以改过超时的请求
-   * 发来的是 `{ timeoutMs: 5000 }` 这样的残缺对象，而不是没有对象。
-   * 类型这样写才能让 `settings ?? DEFAULT` 直接编译不过——那种写法下
-   * 兜底根本不触发，界面会把一堆实际开着的开关显示成关闭。
-   * 正确姿势是 `{ ...DEFAULT_SETTINGS, ...settings }`。
-   */
-  settings?: Partial<RequestSettings>;
-}
-
-// ---------------------------------------------------------------------------
-// 响应
-// ---------------------------------------------------------------------------
-
-export type ResponseBody =
-  | { kind: "text"; content: string }
-  | { kind: "binary"; base64: string }
-  | { kind: "empty" };
-
-export interface HttpResponse {
-  status: number;
-  statusText: string;
-  finalUrl: string;
-  headers: KeyValue[];
-  body: ResponseBody;
-  sizeBytes: number;
-  elapsedMs: number;
-}
-
-// ---------------------------------------------------------------------------
-// 集合树
-// ---------------------------------------------------------------------------
-
-export type TreeNode =
-  | { kind: "folder"; id: string; name: string; children: TreeNode[] }
-  | {
-      kind: "request";
-      id: string;
-      name: string;
-      method: HttpMethod;
-      url: string;
-    }
-  | { kind: "broken"; id: string; name: string; error: string };
-
-// ---------------------------------------------------------------------------
-// 环境
-// ---------------------------------------------------------------------------
-
-export interface EnvVariable {
-  name: string;
-  value: string;
-  secret?: boolean;
-  enabled?: boolean;
-  description?: string;
-}
-
-export interface Environment {
-  name: string;
-  variables: EnvVariable[];
-}
-
-// ---------------------------------------------------------------------------
-// Cookie
-// ---------------------------------------------------------------------------
-
-export interface Cookie {
-  name: string;
-  value: string;
-  /** 不含前导点。是否匹配子域由 hostOnly 表达 */
-  domain: string;
-  path: string;
-  /** true = 只匹配精确主机 */
-  hostOnly?: boolean;
-  secure?: boolean;
-  httpOnly?: boolean;
-  /** RFC 3339；缺省表示会话 cookie */
-  expires?: string;
-}
-
-export interface CookieGroup {
-  domain: string;
-  cookies: Cookie[];
-}
-
-// ---------------------------------------------------------------------------
-// 工作区
-// ---------------------------------------------------------------------------
-
-export interface WorkspaceInfo {
-  root: string;
-  name: string;
-  repoRoot: string;
-}
-
-// ---------------------------------------------------------------------------
-// Git
-// ---------------------------------------------------------------------------
-
-export type FileState =
-  | "added"
-  | "modified"
-  | "deleted"
-  | "renamed"
-  | "copied"
-  | "untracked"
-  | "ignored"
-  | "conflicted";
-
-export interface StatusEntry {
-  path: string;
-  originalPath?: string;
-  state: FileState;
-  staged: boolean;
-}
-
-export interface GitStatus {
-  branch: string | null;
-  upstream: string | null;
-  ahead: number;
-  behind: number;
-  entries: StatusEntry[];
-  hasConflicts: boolean;
-}
-
-export interface CommitInfo {
-  hash: string;
-  shortHash: string;
-  authorName: string;
-  authorEmail: string;
-  /** RFC 3339 */
-  timestamp: string;
-  subject: string;
-  body: string;
-}
-
-export interface BranchInfo {
-  name: string;
-  isCurrent: boolean;
-  isRemote: boolean;
-  upstream?: string;
-}
-
-// ---------------------------------------------------------------------------
-// 错误
-// ---------------------------------------------------------------------------
-
-/** Rust `error::Error` 序列化后的形状 */
-export interface IpcError {
-  kind: IpcErrorKind;
-  message: string;
-}
-
-export type IpcErrorKind =
-  | "io"
-  | "yaml"
-  | "json"
-  | "http"
-  | "url"
-  | "git"
-  | "not-a-git-repo"
-  | "no-workspace"
-  | "path-escape"
-  | "request-not-found"
-  | "unresolved-variable"
-  | "timeout"
-  | "invalid";
+] as const satisfies readonly import("./bindings").HttpMethod[];

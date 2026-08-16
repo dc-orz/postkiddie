@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::Result;
 
 /// 工作区相对某次提交的文件状态。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "kebab-case")]
 pub enum FileState {
     Added,
@@ -35,7 +35,7 @@ pub enum FileState {
     Conflicted,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct StatusEntry {
     /// 相对仓库根的路径，始终使用 `/` 分隔符
@@ -48,7 +48,7 @@ pub struct StatusEntry {
     pub staged: bool,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct GitStatus {
     /// 分离 HEAD 时为 None
@@ -61,7 +61,7 @@ pub struct GitStatus {
     pub has_conflicts: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CommitInfo {
     pub hash: String,
@@ -74,7 +74,7 @@ pub struct CommitInfo {
     pub body: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct BranchInfo {
     pub name: String,

@@ -3,8 +3,13 @@ import { ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { RequestSettings } from "@/types/api";
 
-/** 与 Rust 侧 `RequestSettings::default()` 保持一致 */
-export const DEFAULT_SETTINGS: RequestSettings = {
+/**
+ * 与 Rust 侧 `RequestSettings::default()` 保持一致。
+ *
+ * 标成 `Required` 是必要的：生成的 `RequestSettings` 每个字段都是可选的
+ * （Rust 只序列化偏离默认的字段），拿它当默认值的类型等于没有默认值。
+ */
+export const DEFAULT_SETTINGS: Required<RequestSettings> = {
   timeoutMs: 30_000,
   followRedirects: true,
   maxRedirects: 10,
@@ -58,7 +63,12 @@ function Toggle({
 }
 
 interface SettingsTabProps {
-  settings: RequestSettings;
+  /**
+   * 必须是补全过的设置。声明成 `Required` 而非 `RequestSettings`，
+   * 调用方就无法把 Rust 直接发来的残缺对象塞进来——
+   * 那会让一堆实际开着的开关显示成关闭。
+   */
+  settings: Required<RequestSettings>;
   onChange: (settings: RequestSettings) => void;
 }
 

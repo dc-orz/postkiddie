@@ -53,7 +53,8 @@ function convert(from: RequestBody, to: BodyType): RequestBody {
     case "form-urlencoded":
       return {
         type: "form-urlencoded",
-        fields: from.type === "form-urlencoded" ? from.fields : [],
+        // fields 可能整个缺席（Rust 不发空数组），空表兜底
+        fields: from.type === "form-urlencoded" ? (from.fields ?? []) : [],
       };
     case "graphql":
       return {
@@ -128,7 +129,7 @@ export function BodyTab({ body, onChange }: BodyTabProps) {
           <p className="text-sm text-fg-muted">该请求不发送请求体。</p>
         ) : body.type === "form-urlencoded" ? (
           <KeyValueTable
-            rows={body.fields}
+            rows={body.fields ?? []}
             onChange={(fields) => onChange({ type: "form-urlencoded", fields })}
             namePlaceholder="字段名"
             emptyHint="以 application/x-www-form-urlencoded 编码发送"

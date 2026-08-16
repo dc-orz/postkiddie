@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::cookie::Cookie;
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CookieJar {
     #[serde(default)]

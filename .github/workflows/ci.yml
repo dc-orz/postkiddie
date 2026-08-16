@@ -76,6 +76,17 @@ jobs:
       - name: 单元测试
         run: cargo test --manifest-path src-tauri/Cargo.toml --all-features
 
+      # 上一步会顺带重新生成 TypeScript 绑定。若结果与仓库里的不同，
+      # 说明有人改了 Rust 模型却没提交重新生成的 bindings——
+      # 前端会继续按旧类型编译通过，然后在运行时拿到对不上的数据。
+      # 这正是引入 specta 要根除的那类静默故障，所以必须让 CI 红。
+      - name: 检查 TypeScript 绑定是否最新
+        run: |
+          if ! git diff --exit-code src/types/bindings.ts; then
+            echo "::error::bindings.ts 已过期。请在本地跑 pnpm rs:test 并提交重新生成的文件。"
+            exit 1
+          fi
+
   # 这是个跨端应用，但只在一个平台上跑检查等于没验证跨端。
   # 这个 job 专门盯三类只会在特定平台暴露的问题：
   #   - 路径分隔符（Windows 的 `\` vs 我们统一用的 `/`）

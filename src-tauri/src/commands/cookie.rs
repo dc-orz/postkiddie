@@ -31,7 +31,7 @@ use crate::{
 const LOGIN_WINDOW_LABEL: &str = "pk-login";
 
 /// 按域分组的 cookie，供 UI 展示
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CookieGroup {
     pub domain: String,
@@ -39,6 +39,7 @@ pub struct CookieGroup {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cookie_list(state: State<'_, AppState>) -> Result<Vec<CookieGroup>> {
     let jar = state.workspace()?.read_cookies()?;
     Ok(jar
@@ -49,6 +50,7 @@ pub async fn cookie_list(state: State<'_, AppState>) -> Result<Vec<CookieGroup>>
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cookie_delete(
     state: State<'_, AppState>,
     name: String,
@@ -64,6 +66,7 @@ pub async fn cookie_delete(
 
 /// 清掉某个域及其子域的全部 cookie，相当于「退出登录」
 #[tauri::command]
+#[specta::specta]
 pub async fn cookie_clear_domain(state: State<'_, AppState>, domain: String) -> Result<()> {
     let ws = state.workspace()?;
     let mut jar = ws.read_cookies()?;
@@ -80,7 +83,8 @@ pub async fn cookie_clear_domain(state: State<'_, AppState>, domain: String) -> 
 ///
 /// `url` 决定 cookie 归属的域；`raw` 可以是 Cookie 头的值，也可以是整条 curl 命令。
 #[tauri::command]
-pub async fn cookie_import(state: State<'_, AppState>, url: String, raw: String) -> Result<usize> {
+#[specta::specta]
+pub async fn cookie_import(state: State<'_, AppState>, url: String, raw: String) -> Result<u32> {
     let target: url::Url = url.parse()?;
     let domain = target
         .host_str()
@@ -103,7 +107,7 @@ pub async fn cookie_import(state: State<'_, AppState>, url: String, raw: String)
     ws.write_cookies(&jar)?;
 
     tracing::info!(count, domain = %domain, "已导入 Cookie");
-    Ok(count)
+    Ok(count as u32)
 }
 
 /// 从粘贴内容里取出 Cookie 头的值。
@@ -146,6 +150,7 @@ fn strip_quotes(s: &str) -> &str {
 
 /// 打开内置登录窗口。用户在其中完成登录后，再调用 [`cookie_capture`] 收取。
 #[tauri::command]
+#[specta::specta]
 pub async fn cookie_login_open(app: AppHandle, url: String) -> Result<()> {
     let target: url::Url = url.parse()?;
 
@@ -170,12 +175,13 @@ pub async fn cookie_login_open(app: AppHandle, url: String) -> Result<()> {
 ///
 /// `close_window` 决定收取后是否顺手关掉登录窗口。
 #[tauri::command]
+#[specta::specta]
 pub async fn cookie_capture(
     app: AppHandle,
     state: State<'_, AppState>,
     url: String,
     close_window: bool,
-) -> Result<usize> {
+) -> Result<u32> {
     let target: url::Url = url.parse()?;
 
     let window = app
@@ -196,7 +202,7 @@ pub async fn cookie_capture(
     }
 
     tracing::info!(count, url = %url, "已从登录窗口收取 Cookie");
-    Ok(count)
+    Ok(count as u32)
 }
 
 /// 把 WebView 读到的 cookie 并入罐子，返回并入条数。

@@ -70,52 +70,63 @@ impl AppState {
     }
 }
 
+/// IPC 命令表。
+///
+/// 单独抽出来是因为它有两个消费者：运行时的 `invoke_handler`，
+/// 以及构建期导出 TypeScript 绑定的那一步。两处必须是同一份清单——
+/// 分开写就等于把「命令注册」也变成一处双写，正是引入 specta 要消灭的东西。
+fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
+    tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
+        commands::workspace::workspace_open,
+        commands::workspace::workspace_init,
+        commands::workspace::workspace_tree,
+        commands::workspace::workspace_environments,
+        commands::request::request_read,
+        commands::request::request_save,
+        commands::request::request_create,
+        commands::request::request_delete,
+        commands::request::request_rename,
+        commands::request::request_move,
+        commands::request::folder_create,
+        commands::request::folder_reorder,
+        commands::request::request_send,
+        commands::request::request_check_variables,
+        commands::cookie::cookie_list,
+        commands::cookie::cookie_delete,
+        commands::cookie::cookie_clear_domain,
+        commands::cookie::cookie_import,
+        commands::cookie::cookie_login_open,
+        commands::cookie::cookie_capture,
+        commands::environment::environment_save,
+        commands::environment::environment_create,
+        commands::environment::environment_delete,
+        commands::git::git_status,
+        commands::git::git_stage,
+        commands::git::git_unstage,
+        commands::git::git_discard,
+        commands::git::git_commit,
+        commands::git::git_diff,
+        commands::git::git_log,
+        commands::git::git_branches,
+        commands::git::git_checkout,
+        commands::git::git_fetch,
+        commands::git::git_pull,
+        commands::git::git_push,
+        commands::git::git_show_file,
+    ])
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     init_tracing();
+
+    let builder = specta_builder();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::new())
-        .invoke_handler(tauri::generate_handler![
-            commands::workspace::workspace_open,
-            commands::workspace::workspace_init,
-            commands::workspace::workspace_tree,
-            commands::workspace::workspace_environments,
-            commands::request::request_read,
-            commands::request::request_save,
-            commands::request::request_create,
-            commands::request::request_delete,
-            commands::request::request_rename,
-            commands::request::request_move,
-            commands::request::folder_create,
-            commands::request::folder_reorder,
-            commands::request::request_send,
-            commands::request::request_check_variables,
-            commands::cookie::cookie_list,
-            commands::cookie::cookie_delete,
-            commands::cookie::cookie_clear_domain,
-            commands::cookie::cookie_import,
-            commands::cookie::cookie_login_open,
-            commands::cookie::cookie_capture,
-            commands::environment::environment_save,
-            commands::environment::environment_create,
-            commands::environment::environment_delete,
-            commands::git::git_status,
-            commands::git::git_stage,
-            commands::git::git_unstage,
-            commands::git::git_discard,
-            commands::git::git_commit,
-            commands::git::git_diff,
-            commands::git::git_log,
-            commands::git::git_branches,
-            commands::git::git_checkout,
-            commands::git::git_fetch,
-            commands::git::git_pull,
-            commands::git::git_push,
-            commands::git::git_show_file,
-        ])
+        .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())
         .expect("PostKiddie 启动失败");
 }
@@ -132,4 +143,30 @@ fn init_tracing() {
         .with_target(true)
         .with_ansi(cfg!(debug_assertions))
         .init();
+}
+
+/// 导出 TypeScript 绑定。
+///
+/// 做成 `#[test]` 而不是 build.rs：build.rs 里生成会让每次编译都写一遍文件，
+/// 打断 cargo 的增量判断；而放在测试里，`cargo test` 与 CI 都会执行到，
+/// 绑定过期就表现为工作区出现未提交改动，`git diff --exit-code` 一眼看得出来。
+#[cfg(test)]
+mod bindings {
+    #[test]
+    fn export_typescript_bindings() {
+        use specta_typescript::Typescript;
+
+        super::specta_builder()
+            // 不必显式传 format：tauri-specta 默认就开着 serde phases。
+            // 这一点很要紧——`skip_serializing_if` 让同一个结构在序列化与反序列化
+            // 两个方向上形状不同，统一模式无法表达，specta 会直接拒绝导出。
+            // 分相导出正是我们要的：「Rust 只发偏离默认的字段」必须落到类型里。
+            .export(
+                Typescript::default().header(
+                    "// 此文件由 specta 生成，请勿手工编辑。\n// 改 Rust 侧模型后跑 `cargo test` 重新生成。",
+                ),
+                "../src/types/bindings.ts",
+            )
+            .expect("导出 TypeScript 绑定失败");
+    }
 }

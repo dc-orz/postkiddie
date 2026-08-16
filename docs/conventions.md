@@ -104,8 +104,18 @@ styles/       design tokens 与全局样式
 **前端**按 `kind` 分支（`no-workspace` 引导选目录、`unresolved-variable` 弹变量面板），
 **不要靠匹配 message 文本做逻辑判断**——那会在改文案时静默失效。
 
-`src/types/api.ts` 是 Rust 模型的手工镜像，**改任一侧都要同步另一侧**并跑 `pnpm check`。
-引入自动生成的时机见 [architecture.md](./architecture.md#4-已知取舍与后续演进)。
+**类型与命令签名单向从 Rust 生成**：`tauri-specta` 产出 `src/types/bindings.ts`
+（**勿手改**），`src/types/api.ts` 只是它的别名层——起顺手的名字、补纯前端常量。
+改了 Rust 侧模型跑 `pnpm rs:test` 重新生成。导出做成 `#[cfg(test)]` 而不是 build.rs，
+是为了让绑定过期表现成「工作区里多出未提交的改动」，而不是每次编译都重写文件；
+CI 里 `git diff --exit-code src/types/bindings.ts` 兜住忘记提交的情况。
+没有这道拦截，前端会照旧类型编译通过，直到运行时才拿到对不上的数据。
+
+生成的类型带 `_Serialize` / `_Deserialize` 两个方向，这不是噪声：`skip_serializing_if`
+让同一个结构在两个方向上形状不同（出去时省略默认值，进来时缺字段用默认值），
+一个类型描述不了两者。**前端的视角是反的**——**收到**的是 `_Serialize`，
+**发出**的是 `_Deserialize`；日常用 `api.ts` 里的无后缀别名即可。
+这套方案换掉了什么、代价是什么，见 [architecture.md](./architecture.md#4-已知取舍与后续演进)。
 
 ## 样式
 

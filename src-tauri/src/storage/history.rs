@@ -154,7 +154,7 @@ pub fn append(existing: &str, entry: &HistoryEntry) -> Result<AppendPlan> {
     let line = serde_json::to_string(entry)?;
     let count = existing.lines().filter(|l| !l.trim().is_empty()).count();
 
-    if count + 1 <= COMPACT_AT {
+    if count < COMPACT_AT {
         return Ok(AppendPlan::Append(line));
     }
 

@@ -19,7 +19,7 @@ function prettyPath(path: string): string {
 }
 
 export function WelcomeScreen() {
-  const { open, init, recent, forgetRecent, status } = useWorkspace();
+  const { open, init, recent, forgetRecent, status, error } = useWorkspace();
   const [busyPath, setBusyPath] = useState<string | null>(null);
 
   const loading = status === "loading";
@@ -104,6 +104,19 @@ export function WelcomeScreen() {
         </Button>
         <p className="text-xs text-fg-subtle">目录不是工作区时会引导你初始化</p>
       </div>
+
+      {/*
+        store 里的 error 此前从不展示。启动时自动重开上次的工作区若失败，
+        用户看到的就是一个干净的欢迎页——上次打开的那个去哪了、为什么没进去，
+        一点线索都没有。这条提示是那种情况下唯一的交代。
+      */}
+      {error ? (
+        <div className="max-w-md rounded-md border border-danger-line bg-danger-soft px-3 py-2">
+          <p className="text-xs text-danger">
+            上次的工作区没能打开：<span className="pk-selectable">{error.message}</span>
+          </p>
+        </div>
+      ) : null}
 
       {recent.length > 0 ? (
         <section className="w-full max-w-md">

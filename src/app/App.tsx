@@ -9,12 +9,18 @@ export function App() {
   const info = useWorkspace((s) => s.info);
 
   useEffect(() => {
-    // 启动时自动重开上次的工作区。失败（目录被删/被移走）就静默留在欢迎页，
+    // 启动时自动重开上次的工作区。失败（目录被删/被移走）就留在欢迎页，
     // 用户在最近列表里仍能看到它并自行处理。
+    //
+    // 但失败原因必须落到控制台：这里曾经是 `.catch(() => {})`，
+    // 于是「后端日志显示工作区已打开、界面却停在欢迎页」这种状况完全无从下手——
+    // 静默的 catch 把唯一的线索也丢了。
     const { recent, open } = useWorkspace.getState();
     const last = recent[0];
     if (last) {
-      void open(last).catch(() => {});
+      void open(last).catch((error) => {
+        console.error("自动打开上次的工作区失败", last, error);
+      });
     }
   }, []);
 

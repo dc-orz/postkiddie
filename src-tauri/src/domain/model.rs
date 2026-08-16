@@ -19,6 +19,14 @@
 //! 2. **默认值一律 `skip_serializing_if`。** 只有偏离默认的字段才落盘，
 //!    保证新建请求的 YAML 足够短、diff 里只出现真正改动的行。
 //!
+//!    **但结构的主体字段除外**——这些 struct 同时是发给前端的 IPC 契约，
+//!    跳过意味着前端收到的是 `undefined` 而非空值，取 `.length` / `.some()` 会直接抛异常。
+//!    判据是「它是不是这个结构存在的理由」：`Environment.variables` 为空也要发，
+//!    超时、重定向次数这类可选配置才适用跳过。
+//!
+//!    另需注意：部分字段被跳过时，前端拿到的是**不完整的对象**而不是没有对象。
+//!    所以 TS 侧不能只做 `settings ?? DEFAULT`，得 `{ ...DEFAULT, ...settings }`。
+//!
 //! 3. **有序集合用 `Vec` 而非 `Map`。** HTTP header / query 允许重名，
 //!    且顺序对 diff 稳定性至关重要——`Map` 的序列化顺序不可靠。
 
@@ -349,7 +357,16 @@ pub struct FolderMeta {
 pub struct Environment {
     pub name: String,
 
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// 环境变量表。
+    ///
+    /// 这里刻意**不加** `skip_serializing_if`，是约定 2 的例外。
+    /// 本 struct 同时是 IPC 契约：空表被跳过时，前端拿到的是 `undefined` 而不是 `[]`，
+    /// 一个 `.some()` 就让整个环境弹框崩掉、只剩遮罩——看上去就是「点开是黑屏」。
+    /// 落盘多一行 `variables: []`，换的是契约上「这个字段一定在」。
+    ///
+    /// 判据是「它是不是这个结构的主体」：主体字段为空也要发，
+    /// 可选配置（超时、重定向次数之类）才适用跳过。
+    #[serde(default)]
     pub variables: Vec<EnvVariable>,
 }
 
@@ -556,6 +573,50 @@ mod tests {
 
         assert_eq!(loaded.settings, original.settings);
         assert_eq!(loaded, original);
+    }
+
+    /// 空环境也必须带上 `variables` 字段。
+    ///
+    /// 回归测试：这个字段曾经带着 `skip_serializing_if = "Vec::is_empty"`，
+    /// 于是刚建好、还没有变量的环境发到前端是 `{"name": "..."}`。
+    /// TS 侧声明的是必填数组，`env.variables.some(...)` 当场抛异常，
+    /// React 卸掉整棵子树，用户看到的就是「点开环境管理是一片黑」。
+    #[test]
+    fn empty_environment_still_carries_variables() {
+        let env = Environment {
+            name: "dev".to_owned(),
+            variables: Vec::new(),
+        };
+
+        let json = serde_json::to_value(&env).expect("序列化失败");
+        assert!(
+            json.get("variables")
+                .is_some_and(serde_json::Value::is_array),
+            "IPC 载荷缺少 variables 字段，前端会拿到 undefined：{json}"
+        );
+    }
+
+    /// 部分字段偏离默认时，其余字段仍会被跳过——前端拿到的是**残缺对象**而不是没有对象。
+    ///
+    /// 这条不是在要求改变行为（跳过默认值正是我们想要的落盘策略），
+    /// 而是把它钉成一份契约：前端因此必须 `{ ...DEFAULT, ...settings }` 而非 `?? DEFAULT`。
+    #[test]
+    fn partially_customized_settings_omit_the_defaults() {
+        let settings = RequestSettings {
+            timeout_ms: 5_000,
+            ..Default::default()
+        };
+
+        let json = serde_json::to_value(settings).expect("序列化失败");
+
+        assert!(
+            json.get("timeoutMs").is_some(),
+            "改过的字段必须落盘：{json}"
+        );
+        assert!(
+            json.get("sendCookies").is_none(),
+            "保持默认的字段不该落盘，否则 YAML 会被噪声撑大：{json}"
+        );
     }
 
     /// 工作区配置同样过 IPC，键名也必须一致

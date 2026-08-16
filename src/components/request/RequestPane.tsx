@@ -234,7 +234,11 @@ function TabContent({ tab, draft, update }: TabContentProps) {
     default:
       return (
         <SettingsTab
-          settings={draft.settings ?? DEFAULT_SETTINGS}
+          // 展开合并而非 `?? DEFAULT`：Rust 只序列化偏离默认的字段，
+          // 所以改过超时的请求发来的是 `{ timeoutMs: 5000 }` 这样的**残缺对象**，
+          // 而不是没有对象。用 `??` 的话它非空、兜底不触发，
+          // 「验证 TLS」「发送 Cookie」等会全部显示成关闭——而它们实际是开着的。
+          settings={{ ...DEFAULT_SETTINGS, ...draft.settings }}
           onChange={(settings) => update({ settings })}
         />
       );

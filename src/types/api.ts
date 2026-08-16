@@ -91,7 +91,14 @@ export interface HttpRequest {
   headers?: KeyValue[];
   body?: RequestBody;
   auth?: Auth;
-  settings?: RequestSettings;
+  /**
+   * 注意是 `Partial`：Rust 只序列化偏离默认的字段，所以改过超时的请求
+   * 发来的是 `{ timeoutMs: 5000 }` 这样的残缺对象，而不是没有对象。
+   * 类型这样写才能让 `settings ?? DEFAULT` 直接编译不过——那种写法下
+   * 兜底根本不触发，界面会把一堆实际开着的开关显示成关闭。
+   * 正确姿势是 `{ ...DEFAULT_SETTINGS, ...settings }`。
+   */
+  settings?: Partial<RequestSettings>;
 }
 
 // ---------------------------------------------------------------------------

@@ -113,6 +113,9 @@
   --color-git-behind: var(--pk-git-behind);
   --color-diff-add: var(--pk-diff-add-bg);
   --color-diff-del: var(--pk-diff-del-bg);
+  /* 行号槽比行背景更饱和一档，让左侧那条色带能独立于文字被扫到 */
+  --color-diff-add-gutter: var(--pk-diff-add-gutter);
+  --color-diff-del-gutter: var(--pk-diff-del-gutter);
 
   /* ==================== 排版 ==================== */
   --font-sans: var(--pk-font-sans);

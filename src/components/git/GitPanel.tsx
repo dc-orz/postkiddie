@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { DiffDialog, type DiffTarget } from "@/components/git/DiffDialog";
 import { cn } from "@/lib/cn";
 import { confirmAction, showError } from "@/lib/dialog";
 import { shortcut } from "@/lib/platform";
@@ -68,7 +69,15 @@ function IconButton({
   );
 }
 
-function FileRow({ entry, actions }: { entry: StatusEntry; actions: React.ReactNode }) {
+function FileRow({
+  entry,
+  actions,
+  onOpenDiff,
+}: {
+  entry: StatusEntry;
+  actions: React.ReactNode;
+  onOpenDiff: () => void;
+}) {
   const mark = STATE_MARK[entry.state];
   const { dir, base } = splitPath(entry.path);
 
@@ -83,10 +92,17 @@ function FileRow({ entry, actions }: { entry: StatusEntry; actions: React.ReactN
         {mark.char}
       </span>
 
-      <span className="pk-truncate flex-1 text-xs" title={entry.path}>
+      {/* 点文件名看差异——这是这个列表上最自然的默认动作，
+          用户在别的 git 客户端里也是这么点的 */}
+      <button
+        type="button"
+        onClick={onOpenDiff}
+        title={`${entry.path}\n点击查看差异`}
+        className="pk-truncate flex-1 text-left text-xs"
+      >
         {dir ? <span className="text-fg-subtle">{dir}</span> : null}
         <span className="text-fg-secondary">{base}</span>
-      </span>
+      </button>
 
       <span className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100">
         {actions}
@@ -102,6 +118,7 @@ export function GitPanel() {
   const closePanel = useLayout((s) => s.toggleGitPanel);
 
   const [message, setMessage] = useState("");
+  const [diffTarget, setDiffTarget] = useState<DiffTarget | null>(null);
 
   const { staged, unstaged } = useMemo(() => {
     const entries = status?.entries ?? [];
@@ -234,6 +251,9 @@ export function GitPanel() {
                 <FileRow
                   key={`staged:${entry.path}`}
                   entry={entry}
+                  onOpenDiff={() =>
+                    setDiffTarget({ path: entry.path, side: "staged", untracked: false })
+                  }
                   actions={
                     <IconButton
                       label="取消暂存"
@@ -269,6 +289,13 @@ export function GitPanel() {
                 <FileRow
                   key={`unstaged:${entry.path}`}
                   entry={entry}
+                  onOpenDiff={() =>
+                    setDiffTarget({
+                      path: entry.path,
+                      side: "worktree",
+                      untracked: entry.state === "untracked",
+                    })
+                  }
                   actions={
                     <>
                       <IconButton
@@ -294,6 +321,12 @@ export function GitPanel() {
           </>
         ) : null}
       </div>
+
+      {/*
+        弹框放在 <section> 里没问题——这里不像标题栏那样有 `-webkit-app-region: drag`
+        会渗到后代身上。
+      */}
+      <DiffDialog target={diffTarget} onClose={() => setDiffTarget(null)} />
     </section>
   );
 }

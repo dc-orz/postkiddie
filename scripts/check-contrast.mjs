@@ -148,6 +148,39 @@ const FOREGROUNDS = [
 /** 装饰性前景：阈值放宽 */
 const DECORATIVE_FOREGROUNDS = ["--pk-text-subtle"];
 
+/**
+ * 终端 ANSI 调色板：只可能出现在终端自己的背景上，因此不与通用背景做笛卡尔积。
+ *
+ * 这些颜色承载的是真实信息（红=测试失败、绿=通过、黄=警告），不是装饰，
+ * 所以和正文一样按 AA 要求——传统 ANSI 配色恰恰是在这一点上普遍不合格的。
+ */
+const TERMINAL_FOREGROUNDS = [
+  "fg",
+  "red",
+  "green",
+  "yellow",
+  "blue",
+  "magenta",
+  "cyan",
+  "white",
+  "bright-red",
+  "bright-green",
+  "bright-yellow",
+  "bright-blue",
+  "bright-magenta",
+  "bright-cyan",
+  "bright-white",
+].map((n) => `--pk-term-${n}`);
+
+/**
+ * 两档灰是例外。
+ *
+ * ANSI black / bright-black 在终端里几乎只用于「压暗的次要信息」
+ * （提示符装饰、git log 里的时间戳），要它们达到正文对比度就等于要求
+ * 它们不再是次要信息。按装饰性阈值卡一道下限，保证不会彻底隐形。
+ */
+const TERMINAL_DECORATIVE = ["--pk-term-black", "--pk-term-bright-black"];
+
 /** 固定搭配，不与通用背景做笛卡尔积 */
 const PAIRS = [
   ["--pk-text-on-accent", "--pk-accent-bg"],
@@ -156,7 +189,11 @@ const PAIRS = [
   ["--pk-text-on-accent", "--pk-danger-solid"],
   ["--pk-accent-fg", "--pk-accent-bg-subtle"],
   ...["danger", "success", "warning", "info"].map((s) => [`--pk-${s}-fg`, `--pk-${s}-bg`]),
+  ...TERMINAL_FOREGROUNDS.map((fg) => [fg, "--pk-term-bg"]),
 ];
+
+/** 同上，但按放宽阈值检查 */
+const DECORATIVE_PAIRS = TERMINAL_DECORATIVE.map((fg) => [fg, "--pk-term-bg"]);
 
 function buildChecks() {
   const checks = [];
@@ -167,6 +204,7 @@ function buildChecks() {
     for (const bg of BACKGROUNDS) checks.push({ fg, bg, threshold: AA_DECORATIVE });
   }
   for (const [fg, bg] of PAIRS) checks.push({ fg, bg, threshold: AA });
+  for (const [fg, bg] of DECORATIVE_PAIRS) checks.push({ fg, bg, threshold: AA_DECORATIVE });
   return checks;
 }
 

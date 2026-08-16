@@ -13,4 +13,5 @@ pub mod git;
 pub mod history;
 pub mod postman;
 pub mod request;
+pub mod terminal;
 pub mod workspace;

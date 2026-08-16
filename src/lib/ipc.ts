@@ -11,7 +11,7 @@
  */
 
 import type { Environment, ErrorKind, HttpMethod, HttpRequest, IpcError } from "@/types/api";
-import { commands } from "@/types/bindings";
+import { commands, events } from "@/types/bindings";
 
 /**
  * IPC 调用失败时抛出的错误。
@@ -39,6 +39,11 @@ async function unwrap<T>(call: Promise<IpcResult<T>>): Promise<T> {
     throw new IpcCallError(result.error.kind, result.error.message);
   }
   return result.data;
+}
+
+/** Rust 的 `()` 会生成为 `null`；无返回值的命令摊平成 void，免得调用方到处接一个没用的 null */
+async function unwrapVoid(call: Promise<IpcResult<null>>): Promise<void> {
+  await unwrap(call);
 }
 
 // ---------------------------------------------------------------------------
@@ -148,13 +153,36 @@ export const file = {
 };
 
 // ---------------------------------------------------------------------------
-// Git
+// 终端
 // ---------------------------------------------------------------------------
 
-/** Rust 的 `()` 会生成为 `null`；无返回值的命令摊平成 void，免得调用方到处接一个没用的 null */
-async function unwrapVoid(call: Promise<IpcResult<null>>): Promise<void> {
-  await unwrap(call);
-}
+export const terminal = {
+  /** 在工作区根起一个 PTY 会话，返回它的 id */
+  open: (cols: number, rows: number) => unwrap(commands.terminalOpen(cols, rows)),
+  /** 把按键送进 PTY。data 直接来自 xterm 的 onData。 */
+  write: (id: string, data: string) => unwrapVoid(commands.terminalWrite(id, data)),
+  resize: (id: string, cols: number, rows: number) =>
+    unwrapVoid(commands.terminalResize(id, cols, rows)),
+  close: (id: string) => unwrapVoid(commands.terminalClose(id)),
+
+  /**
+   * 订阅输出。返回取消订阅的函数。
+   *
+   * 输出走事件而非返回值：PTY 是持续产出的流，没有「一次调用一次结果」的边界。
+   * payload 里的 data 是 base64——PTY 里流动的是字节，一批的末尾很可能正卡在
+   * 某个多字节字符中间，见 Rust 侧 `TerminalOutput` 的说明。
+   */
+  onOutput: (handler: (id: string, data: string) => void) =>
+    events.terminalOutput.listen((event) => handler(event.payload.id, event.payload.data)),
+
+  /** 订阅子进程退出。返回取消订阅的函数。 */
+  onExit: (handler: (id: string, code: number) => void) =>
+    events.terminalExit.listen((event) => handler(event.payload.id, event.payload.code)),
+};
+
+// ---------------------------------------------------------------------------
+// Git
+// ---------------------------------------------------------------------------
 
 export const git = {
   status: () => unwrap(commands.gitStatus()),

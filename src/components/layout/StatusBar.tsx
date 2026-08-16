@@ -1,6 +1,14 @@
-import { ArrowDown, ArrowUp, GitBranch, Loader2, TriangleAlert } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  GitBranch,
+  Loader2,
+  SquareTerminal,
+  TriangleAlert,
+} from "lucide-react";
 
 import { cn } from "@/lib/cn";
+import { shortcut } from "@/lib/platform";
 import { useDirtyCount, useGit } from "@/stores/git";
 import { useLayout } from "@/stores/layout";
 
@@ -16,6 +24,8 @@ export function StatusBar() {
   const dirtyCount = useDirtyCount();
   const toggleGitPanel = useLayout((s) => s.toggleGitPanel);
   const gitPanelOpen = useLayout((s) => s.gitPanelOpen);
+  const toggleTerminal = useLayout((s) => s.toggleTerminal);
+  const terminalOpen = useLayout((s) => s.terminalOpen);
 
   return (
     <footer
@@ -75,6 +85,20 @@ export function StatusBar() {
       ) : status ? (
         <span className="text-fg-subtle">工作区干净</span>
       ) : null}
+
+      <button
+        type="button"
+        onClick={toggleTerminal}
+        aria-pressed={terminalOpen}
+        title={`终端 (${shortcut("`")})`}
+        className={cn(
+          "flex items-center gap-1 rounded-sm px-1 hover:bg-hover hover:text-fg",
+          terminalOpen && "bg-accent-soft text-accent-fg",
+        )}
+      >
+        <SquareTerminal size={11} strokeWidth={2} />
+        <span className="font-medium">终端</span>
+      </button>
     </footer>
   );
 }

@@ -1,7 +1,8 @@
 import { Eye, EyeOff, KeyRound, Loader2, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 import { cn } from "@/lib/cn";
 import { confirmAction, showError } from "@/lib/dialog";
 import { useWorkspace } from "@/stores/workspace";
@@ -123,20 +124,10 @@ export function EnvironmentDialog({ open, onClose }: EnvironmentDialogProps) {
   const createEnvironment = useWorkspace((s) => s.createEnvironment);
   const deleteEnvironment = useWorkspace((s) => s.deleteEnvironment);
 
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [draft, setDraft] = useState<Environment | null>(null);
   const [busy, setBusy] = useState(false);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
-
-  // 原生 dialog 的开合只能靠命令式 API，用 effect 把它同步到受控的 open
-  useEffect(() => {
-    const el = dialogRef.current;
-    if (!el) return;
-
-    if (open && !el.open) el.showModal();
-    else if (!open && el.open) el.close();
-  }, [open]);
 
   // 打开时载入第一个环境；关闭时清掉草稿，避免下次打开闪出上次的内容
   useEffect(() => {
@@ -251,16 +242,7 @@ export function EnvironmentDialog({ open, onClose }: EnvironmentDialogProps) {
   }
 
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: 这里的 onClick 只处理「点遮罩关闭」，键盘侧由原生 dialog 的 ESC 承担（触发 onClose），无需再绑按键
-    <dialog
-      ref={dialogRef}
-      onClose={onClose}
-      onClick={(e) => {
-        // 点在 dialog 元素本身 = 点在遮罩上；点内容会命中子元素
-        if (e.target === dialogRef.current) onClose();
-      }}
-      className="pk-dialog w-[46rem] max-w-[90vw]"
-    >
+    <Dialog open={open} onClose={onClose} label="环境管理" className="w-[46rem] max-w-[90vw]">
       <div className="flex h-[26rem] max-h-[80vh] flex-col">
         <header className="flex h-toolbar shrink-0 items-center border-b border-line-subtle px-3">
           <h2 className="flex-1 text-md font-medium">环境管理</h2>
@@ -389,6 +371,6 @@ export function EnvironmentDialog({ open, onClose }: EnvironmentDialogProps) {
           </Button>
         </footer>
       </div>
-    </dialog>
+    </Dialog>
   );
 }

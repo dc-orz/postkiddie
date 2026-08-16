@@ -9,9 +9,10 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 import { cn } from "@/lib/cn";
 import { confirmAction, showError } from "@/lib/dialog";
 import { cookie as ipc } from "@/lib/ipc";
@@ -23,8 +24,6 @@ interface CookieDialogProps {
 }
 
 export function CookieDialog({ open, onClose }: CookieDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
   const [groups, setGroups] = useState<CookieGroup[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [loginUrl, setLoginUrl] = useState("");
@@ -43,13 +42,6 @@ export function CookieDialog({ open, onClose }: CookieDialogProps) {
       await showError(error instanceof Error ? error.message : String(error), "读取 Cookie 失败");
     }
   }, []);
-
-  useEffect(() => {
-    const el = dialogRef.current;
-    if (!el) return;
-    if (open && !el.open) el.showModal();
-    else if (!open && el.open) el.close();
-  }, [open]);
 
   useEffect(() => {
     if (open) void reload();
@@ -107,15 +99,7 @@ export function CookieDialog({ open, onClose }: CookieDialogProps) {
   }
 
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: onClick 仅用于「点遮罩关闭」，键盘侧由原生 dialog 的 ESC 承担
-    <dialog
-      ref={dialogRef}
-      onClose={onClose}
-      onClick={(e) => {
-        if (e.target === dialogRef.current) onClose();
-      }}
-      className="pk-dialog w-[52rem] max-w-[92vw]"
-    >
+    <Dialog open={open} onClose={onClose} label="Cookie 管理" className="w-[52rem] max-w-[92vw]">
       <div className="flex h-[30rem] max-h-[85vh] flex-col">
         <header className="flex h-toolbar shrink-0 items-center gap-2 border-b border-line-subtle px-3">
           <CookieIcon size={14} strokeWidth={1.75} className="text-fg-muted" />
@@ -226,7 +210,7 @@ export function CookieDialog({ open, onClose }: CookieDialogProps) {
           Cookie 只保存在本机 .postkiddie/cookies.yaml，不会提交到 git。
         </p>
       </div>
-    </dialog>
+    </Dialog>
   );
 }
 

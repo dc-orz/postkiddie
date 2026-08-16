@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { WelcomeScreen } from "@/components/layout/WelcomeScreen";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { useWorkspace } from "@/stores/workspace";
 import { Workbench } from "./Workbench";
 
@@ -17,5 +18,12 @@ export function App() {
     }
   }, []);
 
-  return info ? <Workbench /> : <WelcomeScreen />;
+  // 最外层的兜底。弹框各自还有一层（见 ui/Dialog），
+  // 那层负责把故障关在弹框里；到这里说明主界面本身塌了，
+  // resetKey 取工作区路径，换个工作区等于重来一次。
+  return (
+    <ErrorBoundary label="PostKiddie" resetKey={info?.root}>
+      {info ? <Workbench /> : <WelcomeScreen />}
+    </ErrorBoundary>
+  );
 }

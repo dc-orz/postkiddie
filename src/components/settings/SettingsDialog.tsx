@@ -1,7 +1,8 @@
 import { Monitor, Moon, Sun, X } from "lucide-react";
-import { useEffect, useId, useRef } from "react";
+import { useId } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 import { cn } from "@/lib/cn";
 import { resolveScale, SCALE_STEPS, type UiScale, useSettings } from "@/stores/settings";
 import { type ThemeMode, useTheme } from "@/stores/theme";
@@ -110,30 +111,13 @@ interface SettingsDialogProps {
 }
 
 export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const { mode, setMode } = useTheme();
   const { uiScale, setUiScale } = useSettings();
-
-  // 原生 dialog 的开合只能靠命令式 API，用 effect 把它同步到受控的 open
-  useEffect(() => {
-    const el = dialogRef.current;
-    if (!el) return;
-    if (open && !el.open) el.showModal();
-    else if (!open && el.open) el.close();
-  }, [open]);
 
   const effective = resolveScale(uiScale);
 
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: onClick 只处理「点遮罩关闭」，键盘侧由原生 dialog 的 ESC 承担
-    <dialog
-      ref={dialogRef}
-      onClose={onClose}
-      onClick={(e) => {
-        if (e.target === dialogRef.current) onClose();
-      }}
-      className="pk-dialog w-[34rem] max-w-[90vw]"
-    >
+    <Dialog open={open} onClose={onClose} label="设置" className="w-[34rem] max-w-[90vw]">
       <header className="flex h-toolbar shrink-0 items-center border-b border-line-subtle px-4">
         <h2 className="flex-1 text-md font-medium">设置</h2>
         <button
@@ -175,6 +159,6 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
           完成
         </Button>
       </footer>
-    </dialog>
+    </Dialog>
   );
 }

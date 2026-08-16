@@ -28,6 +28,7 @@ import type {
   Environment_Serialize,
   EnvVariable_Serialize,
   GitStatus_Serialize,
+  HistoryEntry_Serialize,
   HttpRequest_Serialize,
   HttpResponse_Serialize,
   KeyValue_Serialize,
@@ -61,6 +62,7 @@ export type Environment = Environment_Serialize;
 export type Cookie = Cookie_Serialize;
 export type CookieGroup = CookieGroup_Serialize;
 export type GitStatus = GitStatus_Serialize;
+export type HistoryEntry = HistoryEntry_Serialize;
 export type StatusEntry = StatusEntry_Serialize;
 export type BranchInfo = BranchInfo_Serialize;
 export type { CommitInfo };

@@ -92,14 +92,14 @@ export const useRequest = create<RequestState>()((set, get) => ({
   },
 
   send: async () => {
-    const { draft } = get();
+    const { draft, id } = get();
     if (!draft) return;
 
     const environment = useWorkspace.getState().activeEnvironment ?? undefined;
     set({ sending: true, sendError: null, missingVariables: [] });
 
     try {
-      const response = await ipc.send(draft, environment);
+      const response = await ipc.send(draft, environment, id);
       set({ response, sending: false });
     } catch (error) {
       const ipcError = toIpcError(error);

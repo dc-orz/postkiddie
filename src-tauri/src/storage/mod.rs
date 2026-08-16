@@ -23,6 +23,7 @@
 //! 或 `git pull` 拉入他人改动后，重新扫描即得到正确状态，不存在需要修复的不一致。
 
 pub mod cookies;
+pub mod history;
 pub mod paths;
 pub mod tree;
 
@@ -40,6 +41,8 @@ pub const PRIVATE_DIR: &str = ".postkiddie";
 pub const SECRETS_FILE: &str = "secrets.yaml";
 /// Cookie 是登录凭证，与密钥同级：只存本机，永不入库
 pub const COOKIES_FILE: &str = "cookies.yaml";
+/// 请求历史：纯本地，记录的是「我这台机器上发生过什么」，不是团队契约
+pub const HISTORY_FILE: &str = "history.jsonl";
 
 #[derive(Debug, Clone)]
 pub struct Workspace {
@@ -235,6 +238,47 @@ impl Workspace {
         std::fs::create_dir_all(&dir)?;
         let yaml = serde_norway::to_string(jar)?;
         std::fs::write(dir.join(COOKIES_FILE), yaml)?;
+        Ok(())
+    }
+
+    pub fn read_history(&self) -> Result<Vec<history::HistoryEntry>> {
+        let path = self.private_path().join(HISTORY_FILE);
+        if !path.exists() {
+            return Ok(Vec::new());
+        }
+        Ok(history::parse(&std::fs::read_to_string(&path)?))
+    }
+
+    /// 追加一条历史。
+    ///
+    /// 失败不该影响请求本身——历史是旁路记录，磁盘满或权限不足时
+    /// 让用户「请求发不出去」是本末倒置，故调用方只记日志、不向上抛。
+    pub fn append_history(&self, entry: &history::HistoryEntry) -> Result<()> {
+        use std::io::Write as _;
+
+        let dir = self.private_path();
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join(HISTORY_FILE);
+        let existing = std::fs::read_to_string(&path).unwrap_or_default();
+
+        match history::append(&existing, entry)? {
+            history::AppendPlan::Append(line) => {
+                let mut file = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&path)?;
+                writeln!(file, "{line}")?;
+            }
+            history::AppendPlan::Rewrite(all) => std::fs::write(&path, all)?,
+        }
+        Ok(())
+    }
+
+    pub fn clear_history(&self) -> Result<()> {
+        let path = self.private_path().join(HISTORY_FILE);
+        if path.exists() {
+            std::fs::remove_file(&path)?;
+        }
         Ok(())
     }
 

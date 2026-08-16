@@ -292,6 +292,8 @@ pub async fn request_send(
     state: State<'_, AppState>,
     request: HttpRequest,
     environment: Option<String>,
+    // id：来源请求的路径，仅用于历史记录。从未保存过的草稿没有来源，传 null。
+    id: Option<String>,
 ) -> Result<HttpResponse> {
     let ws = state.workspace()?;
     let scope = build_scope(&ws, environment.as_deref())?;
@@ -311,6 +313,22 @@ pub async fn request_send(
         jar.purge_expired(&now);
         ws.write_cookies(&jar)?;
         tracing::debug!(count, "已保存响应返回的 Cookie");
+    }
+
+    // 历史是旁路记录，写失败只记日志不上抛：
+    // 磁盘满或权限不足时让用户「请求发不出去」是本末倒置，
+    // 而响应此刻已经拿到手了，丢掉它才是真正的损失。
+    let entry = crate::storage::history::HistoryEntry::from_response(
+        now,
+        id,
+        request.name.clone(),
+        request.method,
+        outcome.response.final_url.clone(),
+        environment,
+        &outcome.response,
+    );
+    if let Err(error) = ws.append_history(&entry) {
+        tracing::warn!(%error, "写入请求历史失败");
     }
 
     Ok(outcome.response)

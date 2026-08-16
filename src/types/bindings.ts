@@ -75,7 +75,7 @@ export const commands = {
 	 *  接收的是**完整的请求对象**而不是路径，因为用户经常在未保存的编辑态下点发送；
 	 *  若从磁盘读取会丢掉当前编辑内容。
 	 */
-	requestSend: (request: HttpRequest_Deserialize, environment: string | null) => typedError<HttpResponse_Serialize, IpcError>(__TAURI_INVOKE("request_send", { request, environment })),
+	requestSend: (request: HttpRequest_Deserialize, environment: string | null, id: string | null) => typedError<HttpResponse_Serialize, IpcError>(__TAURI_INVOKE("request_send", { request, environment, id })),
 	/**
 	 *  在不发送的前提下，列出请求里引用了但当前无法解析的变量。
 	 *  前端用它做发送前的静态提示，比发出去再报错体验好。
@@ -123,6 +123,14 @@ export const commands = {
 	gitPush: (setUpstream: boolean) => typedError<null, IpcError>(__TAURI_INVOKE("git_push", { setUpstream })),
 	/**  读取某个历史版本下的文件内容，用于「与历史版本对比」。 */
 	gitShowFile: (rev: string, path: string) => typedError<string, IpcError>(__TAURI_INVOKE("git_show_file", { rev, path })),
+	/**
+	 *  按时间倒序返回历史，最新的在前。
+	 * 
+	 *  排序放在后端：文件里是追加顺序（旧的在前），而 UI 想要的永远是最近的几条，
+	 *  让每个调用方各自 reverse 一遍只会多出走样的机会。
+	 */
+	historyList: (limit: number | null) => typedError<HistoryEntry_Serialize[], IpcError>(__TAURI_INVOKE("history_list", { limit })),
+	historyClear: () => typedError<null, IpcError>(__TAURI_INVOKE("history_clear")),
 	/**
 	 *  把 base64 内容写入指定路径。
 	 * 
@@ -338,6 +346,63 @@ export type GitStatus_Serialize = {
 	entries: StatusEntry_Serialize[],
 	/**  存在冲突文件，UI 应禁用提交按钮 */
 	hasConflicts: boolean,
+};
+
+/**  历史里保存的响应体。二进制不留内容——回看一段 base64 没有意义，尺寸信息已经够了。 */
+export type HistoryBody = HistoryBody_Serialize | HistoryBody_Deserialize;
+
+/**  历史里保存的响应体。二进制不留内容——回看一段 base64 没有意义，尺寸信息已经够了。 */
+export type HistoryBody_Deserialize = ({ kind: "empty" }) & { content?: never; truncated?: never } | ({ kind: "binary" }) & { content?: never; truncated?: never } | { kind: "text"; content: string; 
+/**  内容被截断过。UI 必须显示出来，否则用户会以为服务端就返回了这么多。 */
+truncated?: boolean };
+
+/**  历史里保存的响应体。二进制不留内容——回看一段 base64 没有意义，尺寸信息已经够了。 */
+export type HistoryBody_Serialize = ({ kind: "empty" }) & { content?: never; truncated?: never } | ({ kind: "binary" }) & { content?: never; truncated?: never } | { kind: "text"; content: string; 
+/**  内容被截断过。UI 必须显示出来，否则用户会以为服务端就返回了这么多。 */
+truncated?: boolean };
+
+export type HistoryEntry = HistoryEntry_Serialize | HistoryEntry_Deserialize;
+
+export type HistoryEntry_Deserialize = {
+	/**  发生时刻，RFC3339。同时用作排序键与列表 key。 */
+	at: string,
+	/**  来源请求的 id（相对工作区根的路径）。从未保存过的草稿没有来源。 */
+	requestId?: string | null,
+	name: string,
+	method: HttpMethod,
+	/**
+	 *  变量插值**之后**实际发出的 URL——回看时想知道的是真实打到了哪儿，
+	 *  而不是 `{{baseUrl}}/users` 这种还原不出上下文的模板。
+	 */
+	url: string,
+	environment?: string | null,
+	status: number,
+	statusText: string,
+	elapsedMs: number,
+	sizeBytes: number,
+	contentType?: string | null,
+	body: HistoryBody_Deserialize,
+};
+
+export type HistoryEntry_Serialize = {
+	/**  发生时刻，RFC3339。同时用作排序键与列表 key。 */
+	at: string,
+	/**  来源请求的 id（相对工作区根的路径）。从未保存过的草稿没有来源。 */
+	requestId?: string | null,
+	name: string,
+	method: HttpMethod,
+	/**
+	 *  变量插值**之后**实际发出的 URL——回看时想知道的是真实打到了哪儿，
+	 *  而不是 `{{baseUrl}}/users` 这种还原不出上下文的模板。
+	 */
+	url: string,
+	environment?: string | null,
+	status: number,
+	statusText: string,
+	elapsedMs: number,
+	sizeBytes: number,
+	contentType?: string | null,
+	body: HistoryBody_Serialize,
 };
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";

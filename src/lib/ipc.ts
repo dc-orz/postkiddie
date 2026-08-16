@@ -71,8 +71,9 @@ export const request = {
   move: (id: string, targetParent: string | null, index: number | null) =>
     unwrap(commands.requestMove(id, targetParent, index)),
   remove: (id: string) => unwrapVoid(commands.requestDelete(id)),
-  send: (req: HttpRequest, environment?: string) =>
-    unwrap(commands.requestSend(req, environment ?? null)),
+  /** id 仅用于历史记录的来源标注；草稿没有来源，传 null */
+  send: (req: HttpRequest, environment?: string, id?: string | null) =>
+    unwrap(commands.requestSend(req, environment ?? null, id ?? null)),
   checkVariables: (req: HttpRequest, environment?: string) =>
     unwrap(commands.requestCheckVariables(req, environment ?? null)),
 };
@@ -115,6 +116,16 @@ export const cookie = {
   loginOpen: (url: string) => unwrapVoid(commands.cookieLoginOpen(url)),
   /** 从登录窗口收取 cookie，返回条数 */
   capture: (url: string, closeWindow = true) => unwrap(commands.cookieCapture(url, closeWindow)),
+};
+
+// ---------------------------------------------------------------------------
+// 历史
+// ---------------------------------------------------------------------------
+
+export const history = {
+  /** 按时间倒序，最新的在前 */
+  list: (limit?: number) => unwrap(commands.historyList(limit ?? null)),
+  clear: () => unwrapVoid(commands.historyClear()),
 };
 
 // ---------------------------------------------------------------------------

@@ -1,8 +1,9 @@
-import { Braces, ChevronDown, Cookie, Layers, Settings } from "lucide-react";
+import { Braces, ChevronDown, Cookie, History, Layers, Settings } from "lucide-react";
 import { useState } from "react";
 
 import { CookieDialog } from "@/components/cookie/CookieDialog";
 import { EnvironmentDialog } from "@/components/environment/EnvironmentDialog";
+import { HistoryDialog } from "@/components/history/HistoryDialog";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { cn } from "@/lib/cn";
 import { isMacOS } from "@/lib/platform";
@@ -27,6 +28,7 @@ export function TitleBar() {
   const [envDialogOpen, setEnvDialogOpen] = useState(false);
   const [cookieDialogOpen, setCookieDialogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   return (
     <>
@@ -85,6 +87,7 @@ export function TitleBar() {
           icon={Cookie}
           onClick={() => setCookieDialogOpen(true)}
         />
+        <IconButton label="请求历史" icon={History} onClick={() => setHistoryOpen(true)} />
         <IconButton label="设置" icon={Settings} onClick={() => setSettingsOpen(true)} />
       </header>
 
@@ -97,6 +100,7 @@ export function TitleBar() {
       */}
       <EnvironmentDialog open={envDialogOpen} onClose={() => setEnvDialogOpen(false)} />
       <CookieDialog open={cookieDialogOpen} onClose={() => setCookieDialogOpen(false)} />
+      <HistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </>
   );

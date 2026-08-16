@@ -113,6 +113,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::git::git_pull,
         commands::git::git_push,
         commands::git::git_show_file,
+        commands::history::history_list,
+        commands::history::history_clear,
         commands::file::file_save_base64,
     ])
 }

@@ -149,6 +149,14 @@ export const commands = {
 	 */
 	fileSaveBase64: (path: string, base64: string) => typedError<null, IpcError>(__TAURI_INVOKE("file_save_base64", { path, base64 })),
 	/**
+	 *  把系统文件选择器给出的绝对路径，换算成相对工作区根的路径。
+	 * 
+	 *  请求文件里存相对路径，是因为集合要跟着仓库走：同一份请求在同事的机器上、
+	 *  在 CI 里都得能用，而 `/Users/某人/...` 只在一台机器上成立。
+	 *  代价是被引用的文件必须待在工作区内——这也正是下面那条错误消息要讲清楚的事。
+	 */
+	fileWorkspaceRelative: (path: string) => typedError<string, IpcError>(__TAURI_INVOKE("file_workspace_relative", { path })),
+	/**
 	 *  在当前工作区根目录起一个终端会话，返回它的 id。
 	 * 
 	 *  工作目录取工作区根而非 git 仓库根：用户在这里敲的多半是针对请求集合的命令，

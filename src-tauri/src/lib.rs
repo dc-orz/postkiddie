@@ -140,6 +140,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::history::history_list,
             commands::history::history_clear,
             commands::file::file_save_base64,
+            commands::file::file_workspace_relative,
             commands::terminal::terminal_open,
             commands::terminal::terminal_write,
             commands::terminal::terminal_resize,

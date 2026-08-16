@@ -150,6 +150,12 @@ export const history = {
 export const file = {
   /** 把 base64 内容写到指定路径。路径应来自系统保存对话框。 */
   saveBase64: (path: string, base64: string) => unwrapVoid(commands.fileSaveBase64(path, base64)),
+  /**
+   * 绝对路径 → 相对工作区根的路径。文件不在工作区内时抛错。
+   *
+   * 请求里引用文件必须用相对路径，否则这份集合一 push 出去，别人那边就找不到文件了。
+   */
+  toWorkspaceRelative: (path: string) => unwrap(commands.fileWorkspaceRelative(path)),
 };
 
 // ---------------------------------------------------------------------------

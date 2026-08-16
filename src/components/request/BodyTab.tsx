@@ -1,5 +1,7 @@
 import { Wand2 } from "lucide-react";
 
+import { FilePicker } from "@/components/request/FilePicker";
+import { MultipartTable } from "@/components/request/MultipartTable";
 import { CodeEditor, type CodeLanguage } from "@/components/ui/CodeEditor";
 import { KeyValueTable } from "@/components/ui/KeyValueTable";
 import { cn } from "@/lib/cn";
@@ -20,8 +22,17 @@ const TYPE_LABELS: Record<BodyType, string> = {
   graphql: "GraphQL",
 };
 
-/** 一期在 UI 上开放的类型。binary/multipart 需要文件选择器，留到后续。 */
-const AVAILABLE: BodyType[] = ["none", "json", "text", "xml", "form-urlencoded", "graphql"];
+/** 按使用频率排列。类型本身由 Rust 的 `RequestBody` 决定，这里只管顺序。 */
+const AVAILABLE: BodyType[] = [
+  "none",
+  "json",
+  "text",
+  "xml",
+  "form-urlencoded",
+  "multipart",
+  "binary",
+  "graphql",
+];
 
 /** 这些类型的内容都存在 `content` 字段里，互相切换时可以保留已输入的文本 */
 const TEXTUAL: BodyType[] = ["json", "text", "xml"];
@@ -56,6 +67,26 @@ function convert(from: RequestBody, to: BodyType): RequestBody {
         // fields 可能整个缺席（Rust 不发空数组），空表兜底
         fields: from.type === "form-urlencoded" ? (from.fields ?? []) : [],
       };
+    case "multipart":
+      return {
+        type: "multipart",
+        // 从 form-urlencoded 切过来时把字段带上：这两种编码的字段语义一致，
+        // 用户多半是发现要传文件才改的类型，不该让他重填一遍
+        fields:
+          from.type === "multipart"
+            ? (from.fields ?? [])
+            : from.type === "form-urlencoded"
+              ? (from.fields ?? []).map((f) => ({
+                  name: f.name,
+                  value: f.value,
+                  // 归一成 boolean：源字段的 enabled 可能整个缺席（Rust 不发默认值），
+                  // 而 exactOptionalPropertyTypes 不允许把 undefined 显式传下去
+                  enabled: f.enabled !== false,
+                }))
+              : [],
+      };
+    case "binary":
+      return { type: "binary", file: from.type === "binary" ? from.file : "" };
     case "graphql":
       return {
         type: "graphql",
@@ -75,8 +106,6 @@ interface BodyTabProps {
 }
 
 export function BodyTab({ body, onChange }: BodyTabProps) {
-  const variables = useKnownVariables();
-
   const canFormat = body.type === "json" && body.content.trim().length > 0;
 
   function handleFormat() {
@@ -125,51 +154,93 @@ export function BodyTab({ body, onChange }: BodyTabProps) {
       </div>
 
       <div className="min-h-0 flex-1 px-3 pb-3">
-        {body.type === "none" ? (
-          <p className="text-sm text-fg-muted">该请求不发送请求体。</p>
-        ) : body.type === "form-urlencoded" ? (
-          <KeyValueTable
-            rows={body.fields ?? []}
-            onChange={(fields) => onChange({ type: "form-urlencoded", fields })}
-            namePlaceholder="字段名"
-            emptyHint="以 application/x-www-form-urlencoded 编码发送"
-          />
-        ) : body.type === "graphql" ? (
-          <div className="flex h-full min-h-0 flex-col gap-2">
-            <div className="min-h-0 flex-1 overflow-hidden rounded-md border border-line bg-surface">
-              <CodeEditor
-                value={body.query}
-                onChange={(query) => onChange({ ...body, query })}
-                language="text"
-                variables={variables}
-                placeholder="query { user(id: 1) { name } }"
-                ariaLabel="GraphQL 查询"
-              />
-            </div>
-            <div className="h-24 shrink-0 overflow-hidden rounded-md border border-line bg-surface">
-              <CodeEditor
-                value={body.variables ?? ""}
-                onChange={(vars) => onChange({ ...body, variables: vars })}
-                language="json"
-                variables={variables}
-                placeholder='{ "id": 1 }'
-                ariaLabel="GraphQL 变量"
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="h-full overflow-hidden rounded-md border border-line bg-surface">
-            <CodeEditor
-              value={textContentOf(body)}
-              onChange={(content) => onChange({ ...body, content } as RequestBody)}
-              language={LANGUAGE[body.type] ?? "text"}
-              variables={variables}
-              placeholder={body.type === "json" ? '{\n  "key": "value"\n}' : "请求体内容"}
-              ariaLabel="请求体"
-            />
-          </div>
-        )}
+        <BodyEditor body={body} onChange={onChange} />
       </div>
+    </div>
+  );
+}
+
+/** 每种请求体各自的编辑器。抽出来后上面的组件只管类型切换与工具栏。 */
+function BodyEditor({ body, onChange }: BodyTabProps) {
+  const variables = useKnownVariables();
+
+  if (body.type === "none") {
+    return <p className="text-sm text-fg-muted">该请求不发送请求体。</p>;
+  }
+
+  if (body.type === "form-urlencoded") {
+    return (
+      <KeyValueTable
+        rows={body.fields ?? []}
+        onChange={(fields) => onChange({ type: "form-urlencoded", fields })}
+        namePlaceholder="字段名"
+        emptyHint="以 application/x-www-form-urlencoded 编码发送"
+      />
+    );
+  }
+
+  if (body.type === "multipart") {
+    return (
+      <MultipartTable
+        fields={body.fields ?? []}
+        onChange={(fields) => onChange({ type: "multipart", fields })}
+      />
+    );
+  }
+
+  if (body.type === "binary") {
+    return (
+      <div className="flex flex-col gap-2">
+        <FilePicker
+          value={body.file}
+          onChange={(file) => onChange({ ...body, file })}
+          placeholder="未选择文件，将发送空请求体"
+        />
+        <p className="text-xs text-fg-subtle">
+          文件内容原样作为请求体发送，Content-Type 按扩展名推断。
+          路径相对工作区根，所以这个文件要放在工作区里才能跟着仓库一起共享。
+        </p>
+      </div>
+    );
+  }
+
+  if (body.type === "graphql") {
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-2">
+        <div className="min-h-0 flex-1 overflow-hidden rounded-md border border-line bg-surface">
+          <CodeEditor
+            value={body.query}
+            onChange={(query) => onChange({ ...body, query })}
+            language="text"
+            variables={variables}
+            placeholder="query { user(id: 1) { name } }"
+            ariaLabel="GraphQL 查询"
+          />
+        </div>
+        <div className="h-24 shrink-0 overflow-hidden rounded-md border border-line bg-surface">
+          <CodeEditor
+            value={body.variables ?? ""}
+            onChange={(vars) => onChange({ ...body, variables: vars })}
+            language="json"
+            variables={variables}
+            placeholder='{ "id": 1 }'
+            ariaLabel="GraphQL 变量"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full overflow-hidden rounded-md border border-line bg-surface">
+      <CodeEditor
+        value={textContentOf(body)}
+        onChange={(content) => onChange({ ...body, content } as RequestBody)}
+        language={LANGUAGE[body.type] ?? "text"}
+        variables={variables}
+        placeholder={body.type === "json" ? '{\n  "key": "value"\n}' : "请求体内容"}
+        ariaLabel="请求体"
+      />
     </div>
   );
 }

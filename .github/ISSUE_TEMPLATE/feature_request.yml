@@ -7,9 +7,9 @@ body:
       value: |
         中英文皆可 / Either language is fine.
 
-        提之前可以先看一眼 [README 的一期范围](../blob/main/README.zh-CN.md#一期范围)——
+        提之前可以先看一眼 [README 的一期范围](https://github.com/dc-orz/postkiddie/blob/main/README.zh-CN.md#一期范围)——
         有些功能是**有意不做**的，理由记在
-        [docs/architecture.md](../blob/main/docs/architecture.md) 里。
+        [docs/architecture.md](https://github.com/dc-orz/postkiddie/blob/main/docs/architecture.md) 里。
         如果你想推翻其中某个决定，直接说，那份文档留下理由正是为了这个。
 
   - type: textarea

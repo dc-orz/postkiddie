@@ -5,10 +5,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        中英文皆可。安全漏洞请勿在此提交，见 [SECURITY.md](../blob/main/SECURITY.md)。
+        中英文皆可。安全漏洞请勿在此提交，见 [SECURITY.md](https://github.com/dc-orz/postkiddie/blob/main/SECURITY.md)。
 
         Either language is fine. For security vulnerabilities, do **not** open an issue —
-        see [SECURITY.md](../blob/main/SECURITY.md).
+        see [SECURITY.md](https://github.com/dc-orz/postkiddie/blob/main/SECURITY.md).
 
   - type: textarea
     id: what-happened

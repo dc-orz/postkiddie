@@ -63,6 +63,22 @@ jobs:
             patchelf \
             libssl-dev
 
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # 这一步不是可选的：`tauri::generate_context!` 在**编译期**就校验
+      # tauri.conf.json 里的 frontendDist（`../dist`）存在，所以 Rust 侧的任何编译
+      # ——包括 clippy 和 cargo test——都得先有前端产物，否则直接
+      # 「proc macro panicked: this path doesn't exist」。
+      - name: 构建前端产物
+        run: pnpm run build
+
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
@@ -88,10 +104,14 @@ jobs:
           fi
 
   # 这是个跨端应用，但只在一个平台上跑检查等于没验证跨端。
-  # 这个 job 专门盯三类只会在特定平台暴露的问题：
+  # 这个 job 专门盯几类只会在特定平台暴露的问题：
   #   - 路径分隔符（Windows 的 `\` vs 我们统一用的 `/`）
   #   - git CLI 在各平台的输出差异与可执行文件定位
+  #   - PTY：Unix 的 openpty 与 Windows 的 ConPTY 是两套实现，shell 也不是同一个
   #   - Tauri 自身的平台条件编译
+  #
+  # 矩阵里没有 ubuntu：上面的 `rust` job 已经在 Linux 上跑完了 clippy 与全部测试，
+  # 再加一遍等于白等一次完整编译（clippy 本身就包含 cargo check）。
   # fail-fast: false —— 一次看全所有平台的问题，而不是修一个再发现下一个。
   cross-platform:
     name: 跨平台编译与测试
@@ -99,7 +119,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        os: [macos-latest, windows-latest]
 
     steps:
       - uses: actions/checkout@v5
@@ -139,12 +159,11 @@ jobs:
       - name: 编译检查
         run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets
 
-      # 在各平台真跑一遍：路径处理与 git 集成的问题只有这样才看得见
+      # 在各平台真跑一遍：路径处理、PTY 与 git 集成的问题只有这样才看得见。
+      #
+      # 这里**不要**设 GIT_AUTHOR_* / GIT_COMMITTER_*。看着像是给没有全局 git 配置的
+      # runner 兜底，实际上是有害的：`tests/git_cli.rs` 的 `temp_repo()` 已经用
+      # `git config` 写好了仓库级身份，而环境变量的优先级高于配置文件——于是那些
+      # 断言 author 的测试会拿到 CI 的名字而挂掉，而且只在 CI 上挂。
       - name: 单元与集成测试
         run: cargo test --manifest-path src-tauri/Cargo.toml --all-features
-        env:
-          # git 集成测试要建提交，CI 的 runner 没有全局身份配置
-          GIT_AUTHOR_NAME: PostKiddie CI
-          GIT_AUTHOR_EMAIL: ci@postkiddie.dev
-          GIT_COMMITTER_NAME: PostKiddie CI
-          GIT_COMMITTER_EMAIL: ci@postkiddie.dev

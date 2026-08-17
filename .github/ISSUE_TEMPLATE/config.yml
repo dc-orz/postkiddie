@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 安全漏洞 / Security vulnerability
+    url: https://github.com/dc-orz/postkiddie/security/advisories/new
+    about: 请勿公开提交安全问题，走私密报告通道 / Please report privately, not as a public issue
+  - name: 设计决策的理由 / Why a decision was made
+    url: https://github.com/dc-orz/postkiddie/blob/main/docs/architecture.md
+    about: 技术选型与被否掉的方案都记在架构文档里 / Choices and rejected alternatives are documented

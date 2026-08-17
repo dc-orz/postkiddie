@@ -1,0 +1,83 @@
+name: Bug 报告 / Bug report
+description: 报告一个问题 / Report something that doesn't work
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        中英文皆可。安全漏洞请勿在此提交，见 [SECURITY.md](../blob/main/SECURITY.md)。
+
+        Either language is fine. For security vulnerabilities, do **not** open an issue —
+        see [SECURITY.md](../blob/main/SECURITY.md).
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么 / What happened
+      description: 实际结果，以及你预期的结果 / What you saw, and what you expected instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤 / Steps to reproduce
+      description: |
+        请尽量具体。能稳定复现的步骤是最有价值的信息。
+        Be specific — reliable reproduction steps are the single most useful thing here.
+      placeholder: |
+        1. 打开工作区 …
+        2. 点击 …
+        3. 看到 …
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统 / OS
+      description: |
+        这个项目在三个平台上各有各的坑（路径分隔符、git CLI 输出差异、WebView 内核差异），
+        缺了这一项往往无从下手。
+      options:
+        - macOS
+        - Windows
+        - Linux
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: 系统版本 / OS version
+      placeholder: "macOS 15.1 / Windows 11 23H2 / Ubuntu 24.04"
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: 应用版本 / App version
+      description: 设置里可以看到；从源码跑的话请给出 commit / Or the commit hash if running from source
+      placeholder: "0.1.0 或 commit 679326c"
+    validations:
+      required: true
+
+  - type: input
+    id: git-version
+    attributes:
+      label: git 版本 / git version
+      description: 只在问题与 git 功能相关时需要（`git --version`） / Only if the issue involves Git features
+      placeholder: "git 2.47.0"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / Logs
+      description: |
+        从源码运行时，终端里的输出。用 `RUST_LOG=postkiddie_lib=debug pnpm app:dev`
+        能拿到更详细的日志。前端报错可以在 WebView 的开发者工具里看（macOS `⌥⌘I`）。
+
+        Terminal output if you run from source. `RUST_LOG=postkiddie_lib=debug pnpm app:dev`
+        gives more detail. Frontend errors show in the WebView devtools.
+      render: shell

@@ -1,0 +1,48 @@
+# 依赖更新。
+#
+# 每周一次而非每天：这个项目的依赖面不大，日更只会制造噪音。
+# 按生态分组提 PR，而不是一个依赖一个 PR——前端那堆 @codemirror/* 各提一个的话，
+# 光是等 CI 就能把一上午耗掉。
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      codemirror:
+        patterns: ["@codemirror/*", "@lezer/*"]
+      tauri:
+        patterns: ["@tauri-apps/*"]
+      xterm:
+        patterns: ["@xterm/*"]
+      dev-tooling:
+        dependency-type: development
+    commit-message:
+      prefix: "build(deps)"
+      prefix-development: "build(deps-dev)"
+
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      tauri:
+        patterns: ["tauri*"]
+      # specta 系列钉在精确版本上（2.x 仍是 rc，rc 之间有过破坏性改动），
+      # 让 dependabot 提出来但分在一组，方便一次评估
+      specta:
+        patterns: ["specta*", "tauri-specta"]
+    commit-message:
+      prefix: "build(deps)"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci(deps)"

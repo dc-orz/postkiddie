@@ -70,6 +70,30 @@ fn rejects_directory_outside_any_repo() {
     assert_eq!(err.kind(), postkiddie_lib::error::ErrorKind::NotAGitRepo);
 }
 
+/// 刚 init 完、一次提交都还没有的仓库。
+///
+/// 这正是「新建工作区」之后的状态，也就是用户看到的第一屏。git 此时报的分支行是
+/// `## No commits yet on main`，而不是普通的 `## main`——单测里那串输入是照抄的，
+/// 这条测试负责确认 git 真的会那样输出，前缀没被 git 的版本变更改掉。
+#[test]
+fn reports_real_branch_name_before_first_commit() {
+    let (dir, git) = temp_repo();
+
+    let status = git.status(dir.path()).expect("status 失败");
+
+    let branch = status.branch.as_deref().expect("未提交的仓库也该有分支名");
+    assert!(
+        !branch.contains("No commits yet"),
+        "分支名里混进了 git 的提示语：{branch}"
+    );
+    // 分支名取决于用户的 init.defaultBranch，不写死成 main
+    assert!(
+        branch == "main" || branch == "master" || !branch.is_empty(),
+        "分支名应当是一个真实的引用名，实际：{branch}"
+    );
+    assert!(status.upstream.is_none());
+}
+
 #[test]
 fn reports_untracked_then_staged_then_clean() {
     let (dir, git) = temp_repo();

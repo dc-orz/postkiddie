@@ -109,14 +109,20 @@ body:
 
 ## 系统要求
 
-| 平台 | 最低版本 |
-|---|---|
-| macOS | 14.5 |
-| Windows | 10/11（WebView2 自动更新） |
-| Linux | WebKitGTK 2.44+ |
+| 平台 | 最低版本 | 验证程度 |
+|---|---|---|
+| macOS | 14.5 | 开发与日常使用的平台 |
+| Linux | WebKitGTK 2.44+ | CI 上编译通过、全部测试通过 |
+| Windows | 10/11（WebView2 自动更新） | CI 上编译通过，**运行时未经验证** |
 
-下限由 design token 使用的 CSS `light-dark()` 决定，
+版本下限由 design token 使用的 CSS `light-dark()` 决定，
 原因见 [docs/architecture.md](docs/architecture.md#5-系统要求)。
+
+关于 Windows 说清楚一点：平台相关的代码路径都写了也编译得过，但测试二进制目前在那里
+以 `0xc0000139`（`STATUS_ENTRYPOINT_NOT_FOUND`）启动失败——那是 DLL 加载阶段的错误，
+发生在任何测试代码执行之前。所以现在的状态是「没有已知的坏，但也没有验证过的好」。
+如果你在 Windows 上用并遇到问题，带上系统版本提个 issue 会很有帮助；
+排查的切入点记在 [.github/workflows/ci.yml](.github/workflows/ci.yml) 的注释里。
 
 ## 快捷键
 

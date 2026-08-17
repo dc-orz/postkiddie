@@ -109,14 +109,21 @@ Full schema: [docs/storage-format.md](docs/storage-format.md).
 
 ## System requirements
 
-| Platform | Minimum |
-|---|---|
-| macOS | 14.5 |
-| Windows | 10/11 (WebView2 auto-updates) |
-| Linux | WebKitGTK 2.44+ |
+| Platform | Minimum | Verification status |
+|---|---|---|
+| macOS | 14.5 | Developed and used here daily |
+| Linux | WebKitGTK 2.44+ | Compiles, full test suite green in CI |
+| Windows | 10/11 (WebView2 auto-updates) | Compiles in CI; **runtime unverified** |
 
-The floor is set by the CSS `light-dark()` function used by the design tokens; the reasoning
-is in [docs/architecture.md](docs/architecture.md#5-系统要求).
+The version floor is set by the CSS `light-dark()` function used by the design tokens; the
+reasoning is in [docs/architecture.md](docs/architecture.md#5-系统要求).
+
+Being explicit about Windows: the platform-specific code paths exist and compile, but the
+test binary currently fails to start there with `0xc0000139`
+(`STATUS_ENTRYPOINT_NOT_FOUND`) — a DLL-loading failure that happens before any test code
+runs. So nothing is *known* broken, but nothing is verified either. If you use Windows and
+hit problems, an issue with your OS version would genuinely help; see the notes in
+[.github/workflows/ci.yml](.github/workflows/ci.yml) for where to start digging.
 
 ## Keyboard shortcuts
 

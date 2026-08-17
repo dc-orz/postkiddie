@@ -1,84 +1,96 @@
 <div align="center">
   <img src="src-tauri/icons/128x128.png" width="72" alt="PostKiddie" />
   <h1>PostKiddie</h1>
-  <p>把 HTTP 请求当代码管：本地 Git 目录持久化，<code>git push</code> 共享。</p>
+  <p><strong>Manage HTTP requests like code.</strong><br />Stored as plain YAML in your own Git repo. Shared with <code>git push</code>.</p>
+
+[![CI](https://github.com/dc-orz/postkiddie/actions/workflows/ci.yml/badge.svg)](https://github.com/dc-orz/postkiddie/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Tauri 2](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)](https://v2.tauri.app/)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)](#system-requirements)
+
+**English** · [简体中文](README.zh-CN.md)
+
 </div>
 
 ---
 
-## 这是什么
+## What is this
 
-一个轻量的 HTTP 客户端桌面应用。请求以纯文本 YAML 存放在你的 git 仓库里，
-版本管理和团队共享直接用 git——没有账号，没有云端，没有后端。
+A lightweight HTTP client for desktop. Requests live as plain YAML files inside your Git
+repository — versioning and team sharing go through Git itself. No accounts, no cloud,
+no backend.
 
 |  | Postman | PostKiddie |
 |---|---|---|
-| 数据存放 | 云端 + 本地缓存 | 本地 git 仓库，纯文本 |
-| 共享方式 | 账号 / 团队工作区 | `git push` / `git pull` |
-| 版本管理 | 平台内置历史 | git 本身（分支、diff、blame、revert） |
-| 权限控制 | 平台角色 | 仓库权限 |
-| 离线可用 | 受限 | 完全可用 |
+| Storage | Cloud + local cache | Plain text in your Git repo |
+| Sharing | Accounts / team workspaces | `git push` / `git pull` |
+| Versioning | Platform-managed history | Git itself — branches, diff, blame, revert |
+| Conflict resolution | Platform strategy | The Git merge flow you already know |
+| Access control | Platform roles | Repository permissions |
+| Offline use | Limited | Fully functional |
 
-于是接口调试自然获得了代码的工作方式：开分支试新接口、发 PR 评审接口变更、
-`git blame` 查这个 header 是谁加的、`git revert` 回退一次误改。
+The point isn't just saving a backend. Once your API collection is a Git repo, API design
+inherits the way code already works: branch to try a new endpoint, open a PR to review an
+interface change, `git blame` to find out who added that header, `git revert` to undo a bad
+edit. Git solved those problems twenty years ago.
 
-## 技术栈
+## Features
 
-| 层 | 选型 |
-|---|---|
-| 桌面框架 | Tauri 2（系统 WebView，安装包 ~10 MB） |
-| 前端 | React 19 · TypeScript 7 · Vite 8 · Tailwind 4 |
-| 状态 | Zustand 5 |
-| 编辑器 | CodeMirror 6 |
-| 后端 | Rust 2024 · tokio · reqwest（rustls + 系统根证书） |
-| 存储 | YAML（`serde_norway`），一请求一文件 |
-| Git | 调用系统 `git` CLI，复用用户已有的凭证与配置 |
-| 终端 | portable-pty（真 PTY）+ xterm.js |
-| 工程 | Biome（lint + format）· lefthook · rustfmt + clippy |
+- **Requests as files** — one request, one YAML file. Its identity *is* its path, so
+  renaming and moving behave correctly and two people creating requests never collide on IDs.
+- **Readable diffs** — multi-line JSON bodies are written as YAML block scalars, verbatim
+  and unescaped, so `git diff` points at the exact JSON line that changed.
+- **Secrets stay local** — environment variables marked `secret` never touch Git. The team
+  shares the contract ("these keys must be filled in"), not the values.
+- **Built-in terminal** — a real PTY running your own shell, opened at the workspace root.
+  Completion, history, aliases, pagers and interactive commands (`git add -p`,
+  `git rebase -i`) all work. Run `git checkout` there and the UI follows along.
+- **Git where you can see it** — branch and ahead/behind counts live in the status bar;
+  branch switching, staging, committing, per-file diffs and push/pull are all in-app.
+- **Session capture** — log in through a built-in window, or paste a `Cookie` header or a
+  whole `curl` command. PostKiddie never reads your browser's credential store
+  ([why](docs/architecture.md)).
+- **No cloud, ever** — everything is the file system and the `git` binary you already have.
 
-选型理由见 [docs/architecture.md](docs/architecture.md)。
+## Quick start
 
-## 快速开始
-
-需要 Node ≥ 22、pnpm、Rust stable、git，以及各平台的 Tauri 系统依赖
-（见 [Tauri 前置条件](https://v2.tauri.app/start/prerequisites/)）。
+Requires Node ≥ 22, pnpm, Rust stable, git, and your platform's Tauri prerequisites
+(see [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)).
 
 ```bash
 pnpm install
 pnpm app:dev
 ```
 
-常用命令：
-
-| 命令 | 作用 |
+| Command | What it does |
 |---|---|
-| `pnpm app:dev` | 启动桌面应用（含热更新） |
-| `pnpm dev` | 只启动前端，浏览器里调 UI |
-| `pnpm app:build` | 打包安装程序 |
-| `pnpm check` | 全量检查：lint + 类型 + 对比度 + rustfmt + clippy |
-| `pnpm test` / `pnpm rs:test` | 前端 / Rust 单元测试 |
-| `pnpm lint:fix` | 自动修复格式与可修的 lint |
-| `pnpm check:contrast` | 校验 design token 的 WCAG 对比度 |
+| `pnpm app:dev` | Run the desktop app with hot reload |
+| `pnpm dev` | Frontend only, in a browser — for UI work |
+| `pnpm app:build` | Build installers |
+| `pnpm check` | Everything: lint + types + contrast + rustfmt + clippy |
+| `pnpm test` / `pnpm rs:test` | Frontend / Rust tests |
+| `pnpm lint:fix` | Auto-fix formatting and fixable lints |
+| `pnpm check:contrast` | Verify WCAG contrast of design tokens |
 
-## 工作区长什么样
+## What a workspace looks like
 
 ```text
-my-api-workspace/            ← 你的 git 仓库
+my-api-workspace/            ← your Git repo
 ├── postkiddie.yaml
 ├── collections/
-│   └── 用户中心/
-│       ├── _folder.yaml     ← 显示顺序、目录级 header/auth
-│       └── 登录.yaml
+│   └── user-center/
+│       ├── _folder.yaml     ← display order, folder-level headers/auth
+│       └── login.yaml
 ├── environments/
-│   └── 本地.yaml
-└── .postkiddie/             ← 本机私有，自动 gitignore
-    └── secrets.yaml         ← 密钥真实值，永不入库
+│   └── local.yaml
+└── .postkiddie/             ← machine-local, auto-gitignored
+    └── secrets.yaml         ← real secret values, never committed
 ```
 
-一个请求就是一个文件：
+One request is one file:
 
 ```yaml
-name: 用户登录
+name: User login
 method: POST
 url: "{{baseUrl}}/auth/login"
 headers:
@@ -93,73 +105,56 @@ body:
     }
 ```
 
-多行 body 用 YAML block scalar 原样落盘，零转义——`git diff` 能精确到 JSON 的某一行。
+Full schema: [docs/storage-format.md](docs/storage-format.md).
 
-标记为 `secret` 的环境变量，其值不会写进 git，只存在本机的 `.postkiddie/secrets.yaml`。
-团队共享的是「有哪些密钥要填」的契约，不是密钥本身。
+## System requirements
 
-完整格式见 [docs/storage-format.md](docs/storage-format.md)。
-
-## 系统要求
-
-| 平台 | 最低版本 |
+| Platform | Minimum |
 |---|---|
 | macOS | 14.5 |
-| Windows | 10/11（WebView2 自动更新） |
+| Windows | 10/11 (WebView2 auto-updates) |
 | Linux | WebKitGTK 2.44+ |
 
-下限由 design token 使用的 CSS `light-dark()` 决定，
-原因见 [docs/architecture.md](docs/architecture.md#5-系统要求)。
+The floor is set by the CSS `light-dark()` function used by the design tokens; the reasoning
+is in [docs/architecture.md](docs/architecture.md#5-系统要求).
 
-## 文档
+## Keyboard shortcuts
 
-- [架构与技术选型](docs/architecture.md) — 每个决策及其理由
-- [Design Tokens](docs/design-tokens.md) — 设计系统
-- [存储格式](docs/storage-format.md) — YAML schema
-- [开发规范](docs/conventions.md) — 代码风格、提交约定、目录职责
-
-## 快捷键
-
-| 操作 | 快捷键 |
+| Action | Shortcut |
 |---|---|
-| 保存请求 | `⌘S` / `Ctrl+S` |
-| 发送请求 | `⌘↩` / `Ctrl+Enter` |
-| 提交（Git 面板内） | `⌘↩` / `Ctrl+Enter` |
-| 开关终端 | `` ⌘` `` / `` Ctrl+` `` |
-| 切换分支 | 点状态栏左侧的分支名 |
-| 查看某个文件的差异 | 在 Git 面板里点文件名 |
-| 调整面板 | 聚焦分割条后按方向键，`Shift` 加速，`Home`/`End` 到边界，双击恢复默认 |
+| Save request | `⌘S` / `Ctrl+S` |
+| Send request | `⌘↩` / `Ctrl+Enter` |
+| Commit (in Git panel) | `⌘↩` / `Ctrl+Enter` |
+| Toggle terminal | `` ⌘` `` / `` Ctrl+` `` |
+| Switch branch | Click the branch name in the status bar |
+| View a file's diff | Click the file name in the Git panel |
+| Resize panels | Focus a splitter, then arrow keys — `Shift` to accelerate, `Home`/`End` for edges, double-click to reset |
 
-## 一期范围
+## Project status
 
-**已实现**
+This is phase one. Working today: workspaces (open/init/switch), collections with drag
+reordering, the full request editor (7 body types, 4 auth modes), responses, environments,
+cookies, history, Postman v2.x import, the Git panel with per-file diffs and branch
+switching, and the built-in terminal.
 
-- 工作区：打开/初始化（目录不是 git 仓库时引导就地 `git init`）、最近打开、启动自动重开、
-  标题栏随时切换（切换时请求、git 状态与终端会话一并作废，有未保存改动会先问一声）
-- 集合：目录树、新建/重命名/删除请求与文件夹、拖拽排序（只改 `_folder.yaml` 一处）、
-  损坏文件标红而非消失
-- 请求：方法与 URL、查询参数与请求头（可逐条启用/禁用）、
-  JSON/文本/XML/Form/Multipart/二进制/GraphQL 请求体、四种认证方式、
-  超时与 TLS 校验等请求级设置
-- 编辑器：CodeMirror 6 语法高亮、`{{变量}}` 高亮（未定义的标红波浪线）、JSON 格式化（保留变量）
-- 响应：状态码/耗时/体积、语法高亮、JSON 美化开关、响应头表格、一键复制、另存为文件
-- 环境：环境切换、变量插值、`secret` 变量不入库
-- Cookie：按域查看与删除、粘贴导入（`Cookie` 头或整条 curl）、内置登录窗口捕获会话
-- 历史：每次发送都记进 `.postkiddie/history.jsonl`，可回看请求与响应
-- 导入：Postman Collection v2.x
-- Git：状态栏常驻分支与 ahead/behind、分支切换与新建、变更列表（暂存/工作区分区）、
-  暂存/取消暂存/丢弃、提交、推送拉取、逐文件差异对比、集合树上的文件状态标记
-- 终端：内置真 PTY，就是你平时那个 shell（补全、历史、别名、分页、颜色、交互式命令都在），
-  开在工作区根目录；跑完命令自动重扫集合树与 git 状态，所以 `git checkout` 之后界面会跟着变
-- 布局：侧栏、请求区与终端可拖拽调整并持久化，键盘同样可操作
+Not built yet: gRPC/WebSocket, scripting and assertions (pre-request / test), a mock server,
+collection runners and code generation. See the
+[Chinese README](README.zh-CN.md#一期范围) for the itemized list.
 
-**尚未实现**
+## Documentation
 
-- gRPC / WebSocket
-- 脚本与断言（pre-request / test）
-- Mock Server
-- 集合批量运行（Runner）、代码生成（导出成 curl / fetch 片段）
-- 并排式差异对比（目前是行内 unified，与 `git diff` 一致）
+The design docs are written in Chinese — they record not just decisions but the reasoning
+behind them, which matters most when you want to overturn one.
+
+- [Architecture and technology choices](docs/architecture.md) — every decision and why
+- [Design tokens](docs/design-tokens.md) — the design system
+- [Storage format](docs/storage-format.md) — the YAML schema
+- [Development conventions](docs/conventions.md) — code style, commit format, directory roles
+
+## Contributing
+
+Issues and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md); it
+covers the toolchain, the commit format, and what the Git hooks will check before you push.
 
 ## License
 

@@ -33,6 +33,7 @@
 | 后端 | Rust 2024 · tokio · reqwest（rustls + 系统根证书） |
 | 存储 | YAML（`serde_norway`），一请求一文件 |
 | Git | 调用系统 `git` CLI，复用用户已有的凭证与配置 |
+| 终端 | portable-pty（真 PTY）+ xterm.js |
 | 工程 | Biome（lint + format）· lefthook · rustfmt + clippy |
 
 选型理由见 [docs/architecture.md](docs/architecture.md)。
@@ -124,28 +125,41 @@ body:
 | 保存请求 | `⌘S` / `Ctrl+S` |
 | 发送请求 | `⌘↩` / `Ctrl+Enter` |
 | 提交（Git 面板内） | `⌘↩` / `Ctrl+Enter` |
+| 开关终端 | `` ⌘` `` / `` Ctrl+` `` |
+| 切换分支 | 点状态栏左侧的分支名 |
+| 查看某个文件的差异 | 在 Git 面板里点文件名 |
 | 调整面板 | 聚焦分割条后按方向键，`Shift` 加速，`Home`/`End` 到边界，双击恢复默认 |
 
 ## 一期范围
 
 **已实现**
 
-- 工作区：打开/初始化（目录不是 git 仓库时引导就地 `git init`）、最近打开、启动自动重开
-- 集合：目录树、新建请求/文件夹、`_folder.yaml` 控制显示顺序、损坏文件标红而非消失
-- 请求：方法与 URL、查询参数与请求头（可逐条启用/禁用）、JSON/文本/XML/Form/GraphQL 请求体、
-  四种认证方式、超时与 TLS 校验等请求级设置
+- 工作区：打开/初始化（目录不是 git 仓库时引导就地 `git init`）、最近打开、启动自动重开、
+  标题栏随时切换（切换时请求、git 状态与终端会话一并作废，有未保存改动会先问一声）
+- 集合：目录树、新建/重命名/删除请求与文件夹、拖拽排序（只改 `_folder.yaml` 一处）、
+  损坏文件标红而非消失
+- 请求：方法与 URL、查询参数与请求头（可逐条启用/禁用）、
+  JSON/文本/XML/Form/Multipart/二进制/GraphQL 请求体、四种认证方式、
+  超时与 TLS 校验等请求级设置
 - 编辑器：CodeMirror 6 语法高亮、`{{变量}}` 高亮（未定义的标红波浪线）、JSON 格式化（保留变量）
-- 响应：状态码/耗时/体积、语法高亮、JSON 美化开关、响应头表格、一键复制
+- 响应：状态码/耗时/体积、语法高亮、JSON 美化开关、响应头表格、一键复制、另存为文件
 - 环境：环境切换、变量插值、`secret` 变量不入库
-- Git：状态栏常驻分支与 ahead/behind、变更列表（暂存/工作区分区）、暂存/取消暂存/丢弃、
-  提交、推送拉取、集合树上的文件状态标记
-- 布局：侧栏与请求区可拖拽调整并持久化，键盘同样可操作
+- Cookie：按域查看与删除、粘贴导入（`Cookie` 头或整条 curl）、内置登录窗口捕获会话
+- 历史：每次发送都记进 `.postkiddie/history.jsonl`，可回看请求与响应
+- 导入：Postman Collection v2.x
+- Git：状态栏常驻分支与 ahead/behind、分支切换与新建、变更列表（暂存/工作区分区）、
+  暂存/取消暂存/丢弃、提交、推送拉取、逐文件差异对比、集合树上的文件状态标记
+- 终端：内置真 PTY，就是你平时那个 shell（补全、历史、别名、分页、颜色、交互式命令都在），
+  开在工作区根目录；跑完命令自动重扫集合树与 git 状态，所以 `git checkout` 之后界面会跟着变
+- 布局：侧栏、请求区与终端可拖拽调整并持久化，键盘同样可操作
 
 **尚未实现**
 
-- 请求重命名与拖拽排序、multipart/binary 请求体、Cookie 视图、响应另存为
-- 差异对比视图、分支切换 UI、历史记录
-- gRPC/WebSocket、脚本与断言、Mock Server、Postman 集合导入（导入最可能优先补上）
+- gRPC / WebSocket
+- 脚本与断言（pre-request / test）
+- Mock Server
+- 集合批量运行（Runner）、代码生成（导出成 curl / fetch 片段）
+- 并排式差异对比（目前是行内 unified，与 `git diff` 一致）
 
 ## License
 

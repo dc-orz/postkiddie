@@ -397,12 +397,22 @@ fn parse_status(raw: &str) -> GitStatus {
     status
 }
 
+/// 仓库还没有任何提交时，git 报的分支行是 `## No commits yet on main`。
+///
+/// 这串前缀属于 porcelain 格式本身，不随 locale 变化，所以按字面量剥安全。
+const UNBORN_PREFIX: &str = "No commits yet on ";
+
 fn parse_branch_line(rest: &str, status: &mut GitStatus) {
     // 形如 `main...origin/main [ahead 1, behind 2]`，或分离 HEAD 时 `HEAD (no branch)`
     let (refs, tracking) = match rest.split_once(" [") {
         Some((r, t)) => (r, Some(t.trim_end_matches(']'))),
         None => (rest, None),
     };
+
+    // 刚 git init 完、还没提交过的仓库走这条。不剥前缀的话，整句会被当成分支名，
+    // 状态栏和分支切换器上就会显示「No commits yet on main」——
+    // 而这恰恰是新建工作区后用户看到的第一屏。
+    let refs = refs.strip_prefix(UNBORN_PREFIX).unwrap_or(refs);
 
     match refs.split_once("...") {
         Some((local, upstream)) => {
@@ -502,6 +512,26 @@ mod tests {
         let s = parse_status("## feature/new-api\0");
         assert_eq!(s.branch.as_deref(), Some("feature/new-api"));
         assert!(s.upstream.is_none());
+    }
+
+    /// 刚 init 完、还没提交过的仓库。这是新建工作区后用户看到的第一个状态，
+    /// 漏了这条前缀，状态栏会把整句英文当成分支名显示出来。
+    #[test]
+    fn parses_branch_of_repo_without_commits() {
+        let s = parse_status("## No commits yet on main\0");
+        assert_eq!(s.branch.as_deref(), Some("main"));
+        assert!(s.upstream.is_none());
+        assert_eq!((s.ahead, s.behind), (0, 0));
+    }
+
+    /// 分支名里带 `on ` 的情况：剥前缀只能从头部剥，不能当成子串到处匹配
+    #[test]
+    fn keeps_branch_names_containing_the_prefix_words() {
+        let s = parse_status("## feature/no-commits-yet-on-purpose\0");
+        assert_eq!(
+            s.branch.as_deref(),
+            Some("feature/no-commits-yet-on-purpose")
+        );
     }
 
     /// 中文路径是 `-z` 存在的理由：不加它 git 会把非 ASCII 转义成 `\344\270\255`

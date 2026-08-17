@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "@/app/App";
+import { initSession } from "@/stores/session";
 import { initUiScale } from "@/stores/settings";
 import { initTheme } from "@/stores/theme";
 import "@/styles/global.css";
@@ -9,6 +10,8 @@ import "@/styles/global.css";
 // 在 React 挂载前落定主题与缩放，避免首帧闪一下默认配色、或按默认字号排完版再跳一次
 initTheme();
 initUiScale();
+// 跨 store 的工作区联动。必须早于第一次 open（App 挂载后会自动重开上次的工作区）。
+initSession();
 
 const container = document.getElementById("root");
 if (!container) {

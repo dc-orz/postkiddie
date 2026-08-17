@@ -78,6 +78,7 @@ specta = { version = "=2.0.0-rc.25", features = ["derive"] }
 specta-typescript = "0.0.12"
 tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 specta-serde = "0.0.12"
+portable-pty = { version = "0.9", default-features = false }
 
 [dev-dependencies]
 tokio = { version = "1.53", features = ["full", "test-util"] }

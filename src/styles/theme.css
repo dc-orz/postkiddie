@@ -41,6 +41,9 @@
   --color-active: var(--pk-bg-active);
   --color-selected: var(--pk-bg-selected);
   --color-disabled: var(--pk-bg-disabled);
+  /* 终端底色。单独一档而不是复用 sunken：xterm 会把这个颜色也写进它自己的
+     theme 对象，两边必须是同一个值，否则面板边缘会露出一圈色差 */
+  --color-term: var(--pk-term-bg);
 
   /* ---- 前景（fg- 前缀） ---- */
   --color-fg: var(--pk-text-primary);
@@ -110,6 +113,9 @@
   --color-git-behind: var(--pk-git-behind);
   --color-diff-add: var(--pk-diff-add-bg);
   --color-diff-del: var(--pk-diff-del-bg);
+  /* 行号槽比行背景更饱和一档，让左侧那条色带能独立于文字被扫到 */
+  --color-diff-add-gutter: var(--pk-diff-add-gutter);
+  --color-diff-del-gutter: var(--pk-diff-del-gutter);
 
   /* ==================== 排版 ==================== */
   --font-sans: var(--pk-font-sans);

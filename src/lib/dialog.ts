@@ -13,12 +13,14 @@ export async function pickDirectory(title: string): Promise<string | null> {
   return typeof selected === "string" ? selected : null;
 }
 
-/** 打开文件选择器，按扩展名过滤。用户取消时返回 null。 */
+/** 打开文件选择器。不传 filters 表示接受任意文件。用户取消时返回 null。 */
 export async function pickFile(
   title: string,
-  filters: { name: string; extensions: string[] }[],
+  filters?: { name: string; extensions: string[] }[],
 ): Promise<string | null> {
-  const selected = await open({ multiple: false, title, filters });
+  const selected = await open(
+    filters ? { multiple: false, title, filters } : { multiple: false, title },
+  );
   return typeof selected === "string" ? selected : null;
 }
 

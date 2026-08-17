@@ -59,6 +59,7 @@ commands/    Tauri IPC 边界：解参数、转错误，不含业务规则
 http/        请求执行与变量插值
 git/         GitBackend trait 及其 CLI 实现
 storage/     工作区扫描、YAML 读写、路径安全
+terminal/    内置终端的 PTY 会话管理
 domain/      纯数据与规则
 error.rs     统一错误类型
 ```
@@ -73,7 +74,7 @@ app/          应用组装
 components/   纯展示组件，只接收 props
   ui/         无领域概念的基础件（Button、Badge）
   layout/     骨架（TitleBar、StatusBar）
-  <domain>/   领域组件（sidebar、request、response、git）
+  <domain>/   领域组件（sidebar、request、response、git、terminal）
 features/     领域功能组合
 stores/       Zustand 全局状态
 lib/          工具与 IPC 封装

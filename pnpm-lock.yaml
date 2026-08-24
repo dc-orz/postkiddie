@@ -66,8 +66,8 @@ importers:
         specifier: ^2.1.1
         version: 2.1.1
       immer:
-        specifier: ^11.1.16
-        version: 11.1.16
+        specifier: ^11.1.18
+        version: 11.1.18
       lucide-react:
         specifier: ^1.31.0
         version: 1.31.0(react@19.2.8)
@@ -82,7 +82,7 @@ importers:
         version: 3.6.0
       zustand:
         specifier: ^5.0.15
-        version: 5.0.15(@types/react@19.2.18)(immer@11.1.16)(react@19.2.8)
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.18)(react@19.2.8)
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.5.8
@@ -1170,8 +1170,8 @@ packages:
     resolution: {integrity: sha512-CV9TW3Y3f8/wT0BRFc1/KAVQ3TUHiXmaAb6VW9vtiMFf7SLoMd1PdAc4W3KFOFETBJUb90KatHqlsZMWV+R9Gg==}
     engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
 
-  immer@11.1.16:
-    resolution: {integrity: sha512-Xs7H9rBc+kti1J6RueUvbEBkmOz7jqj11XYgf+YMXAYzu8EeE7hwZ9poLXdVfVnGmJu7QAf41T7H2KuF6QoK6Q==}
+  immer@11.1.18:
+    resolution: {integrity: sha512-EQyQtLiYW029lyoczMl/Hh4Xu7cDecSc58JRYpHyL4tIAu3eqd1yJzQX04d2BZHDkzFFvm6qJEJWOtfDSWAXbQ==}
 
   is-potential-custom-element-name@1.0.1:
     resolution: {integrity: sha512-bCYeRA2rVibKZd+s2625gGnGF/t7DSqDs4dP7CrLA1m7jKWz6pps0LpYLJN8Q64HtmPKJ1hrN3nzPNKFEKOUiQ==}
@@ -2962,7 +2962,7 @@ snapshots:
     transitivePeerDependencies:
       - '@noble/hashes'
 
-  immer@11.1.16: {}
+  immer@11.1.18: {}
 
   is-potential-custom-element-name@1.0.1: {}
 
@@ -3373,8 +3373,8 @@ snapshots:
 
   xmlchars@2.2.0: {}
 
-  zustand@5.0.15(@types/react@19.2.18)(immer@11.1.16)(react@19.2.8):
+  zustand@5.0.15(@types/react@19.2.18)(immer@11.1.18)(react@19.2.8):
     optionalDependencies:
       '@types/react': 19.2.18
-      immer: 11.1.16
+      immer: 11.1.18
       react: 19.2.8

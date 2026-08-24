@@ -30,7 +30,7 @@
     "prepare": "lefthook install"
   },
   "dependencies": {
-    "@ark-ui/react": "^5.38.1",
+    "@ark-ui/react": "^5.38.2",
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.10.4",
     "@codemirror/lang-json": "^6.0.2",
